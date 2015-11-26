@@ -54,23 +54,23 @@ class QueryObserverClient(object):
         kwargs['event'] = event
         self._redis.publish(connection.QUERYOBSERVER_REDIS_CHANNEL, pickle.dumps(kwargs))
 
-    def notify_model_insert(self, model):
+    def notify_table_insert(self, table):
         """
-        Notifies the query observer that a model instance has been inserted.
-        """
-
-        return self._notify('model_insert', model=model)
-
-    def notify_model_update(self, model):
-        """
-        Notifies the query observer that a model instance has been changed.
+        Notifies the query observer that a table instance has been inserted.
         """
 
-        return self._notify('model_update', model=model)
+        return self._notify('table_insert', table=table)
 
-    def notify_model_remove(self, model):
+    def notify_table_update(self, table):
         """
-        Notifies the query observer that a model instance has been removed.
+        Notifies the query observer that a table instance has been changed.
         """
 
-        return self._notify('model_remove', model=model)
+        return self._notify('table_update', table=table)
+
+    def notify_table_remove(self, table):
+        """
+        Notifies the query observer that a table instance has been removed.
+        """
+
+        return self._notify('table_remove', table=table)

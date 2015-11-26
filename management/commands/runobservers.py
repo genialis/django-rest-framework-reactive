@@ -70,17 +70,14 @@ class RedisObserverEventHandler(gevent.Greenlet):
             finally:
                 db.close_old_connections()
 
-    def event_model_insert(self):
-        # TODO
-        pass
+    def event_table_insert(self, table):
+        pool.notify_update(table)
 
-    def event_model_update(self):
-        # TODO
-        pass
+    def event_table_update(self, table):
+        pool.notify_update(table)
 
-    def event_model_remove(self):
-        # TODO
-        pass
+    def event_table_remove(self, table):
+        pool.notify_update(table)
 
 
 class WSGIObserverCommandHandler(pywsgi.WSGIServer):

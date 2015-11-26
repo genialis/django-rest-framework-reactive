@@ -10,3 +10,7 @@ class SerializerAlreadyRegistered(QueryObserverException):
 
 class SerializerNotRegistered(QueryObserverException):
     pass
+
+
+class ObserverStopped(QueryObserverException):
+    pass
