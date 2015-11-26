@@ -26,7 +26,6 @@ class QueryObserverPool(object):
             self._observers[query_observer] = query_observer
 
         query_observer.subscribe(subscriber)
-        return query_observer
-        # pool.observe_queryset(queryset, 'session-id')
+        return query_observer.evaluate()
 
 pool = QueryObserverPool()

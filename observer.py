@@ -27,7 +27,7 @@ class QueryObserver(object):
 
     def evaluate(self):
         # TODO: Evaluate the query again and compare results.
-        pass
+        return self._serializer(self._queryset, many=True).data
 
     def subscribe(self, subscriber):
         self._subscribers.add(subscriber)

@@ -17,12 +17,11 @@ import json
 from django import db
 from django.core import exceptions
 from django.core.management import base
-from django.conf import settings
 
+from genesis.queryobserver import connection
+from genesis.queryobserver.pool import pool
 
-# Redis channel for receiving control messages.
-QUERYOBSERVER_REDIS_CHANNEL = 'genesis:queryobserver:control'
-
+# Logger.
 logger = logging.getLogger(__name__)
 
 
@@ -40,15 +39,9 @@ class RedisObserverEventHandler(gevent.Greenlet):
         """
 
         # Establish a connection with Redis server.
-        defaults = {
-            'host': 'localhost',
-            'port': 6379,
-            'db': 0,
-        }
-        defaults.update(getattr(settings, 'REDIS_CONNECTION', {}))
-        self._redis = redis.StrictRedis(**defaults)
+        self._redis = redis.StrictRedis(**connection.get_redis_settings())
         self._pubsub = self._redis.pubsub(ignore_subscribe_messages=True)
-        self._pubsub.subscribe(QUERYOBSERVER_REDIS_CHANNEL)
+        self._pubsub.subscribe(connection.QUERYOBSERVER_REDIS_CHANNEL)
 
         for event in self._pubsub.listen():
             # Events are assumed to be pickled data.
@@ -60,7 +53,7 @@ class RedisObserverEventHandler(gevent.Greenlet):
 
             # Handle event.
             try:
-                event_name = event.pop('name')
+                event_name = event.pop('event')
                 handler = getattr(self, 'event_%s' % event_name)
             except AttributeError:
                 logger.error("Ignoring unimplemented event '%s'." % event_name)
@@ -73,24 +66,41 @@ class RedisObserverEventHandler(gevent.Greenlet):
                 handler(**event)
             except:
                 logger.error("Unhandled exception while executing event '%s'." % event_name)
-                logger.error(format_exc())
+                logger.error(traceback.format_exc())
+            finally:
+                db.close_old_connections()
 
     def event_model_insert(self):
+        # TODO
         pass
 
     def event_model_update(self):
+        # TODO
         pass
 
     def event_model_remove(self):
+        # TODO
         pass
 
 
 class WSGIObserverCommandHandler(pywsgi.WSGIServer):
+    """
+    A WSGI-based RPC server for the query observer API.
+    """
+
     def __init__(self, *args, **kwargs):
+        """
+        Constructs a new WSGI server for handling query observer RPC.
+        """
+
         kwargs['application'] = self.handle_rpc_request
         super(WSGIObserverCommandHandler, self).__init__(*args, **kwargs)
 
     def handle_rpc_request(self, environ, start_response):
+        """
+        Handles an incoming RPC request.
+        """
+
         try:
             request = pickle.loads(environ['wsgi.input'].read())
             if not isinstance(request, dict):
@@ -110,12 +120,27 @@ class WSGIObserverCommandHandler(pywsgi.WSGIServer):
             start_response('400 Bad Request', [('Content-Type', 'text/json')])
             return [json.dumps({'error': "Bad request."})]
         except:
+            logger.error("Unhandled exception while executing command '%s'." % command)
+            logger.error(traceback.format_exc())
+
             start_response('500 Internal Server Error', [('Content-Type', 'text/json')])
             return [json.dumps({'error': "Internal server error."})]
+        finally:
+            db.close_old_connections()
 
-    def command_create_observer(self, queryset):
-        # TODO
-        return {}
+    def command_create_observer(self, query, subscriber):
+        """
+        Starts observing a specific query.
+
+        :param query: Query instance to observe
+        :param subscriber: Subscriber channel name
+        :return: Serialized current query results
+        """
+
+        # Create a queryset back from the pickled query.
+        queryset = query.model.objects.all()
+        queryset.query = query
+        return pool.observe_queryset(queryset, subscriber)
 
 
 class Command(base.BaseCommand):
@@ -135,10 +160,6 @@ class Command(base.BaseCommand):
         event_handler.start()
 
         # Prepare the RPC server.
-        defaults = {
-            'host': 'localhost',
-            'port': 9432,
-        }
-        defaults.update(getattr(settings, 'QUERYOBSERVER', {}))
-        rpc_server = WSGIObserverCommandHandler((defaults['host'], defaults['port']))
+        info = connection.get_queryobserver_settings()
+        rpc_server = WSGIObserverCommandHandler((info['host'], info['port']))
         rpc_server.serve_forever()
