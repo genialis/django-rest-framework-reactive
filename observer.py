@@ -6,6 +6,11 @@ from . import exceptions
 
 
 class QueryObserver(object):
+    """
+    A query observer observes a specific queryset for changes and propagates these
+    changes to all interested subscribers.
+    """
+
     STATUS_NEW = 'new'
     STATUS_INITIALIZING = 'initializing'
     STATUS_OBSERVING = 'observing'
@@ -31,6 +36,12 @@ class QueryObserver(object):
         self._serializer = pool.get_serializer(self._queryset.model)
 
     def add_dependency(self, table):
+        """
+        Registers a new dependency for this query observer.
+
+        :param table: Name of the dependent database table
+        """
+
         if table in self._dependencies:
             return
 
@@ -39,9 +50,20 @@ class QueryObserver(object):
 
     @property
     def stopped(self):
+        """
+        True if the query observer has been stopped.
+        """
+
         return self.status == QueryObserver.STATUS_STOPPED
 
-    def evaluate(self):
+    def evaluate(self, return_full=True):
+        """
+        Evaluates the query observer and checks if there have been any changes. This function
+        may yield.
+
+        :param return_full: True if the full set of rows should be returned
+        """
+
         if self.status == QueryObserver.STATUS_STOPPED:
             raise exceptions.ObserverStopped
 
@@ -62,7 +84,9 @@ class QueryObserver(object):
         # TODO: Only compute difference between old and new, ideally on the SQL server using hashes.
         new_results = collections.OrderedDict()
         primary_key = self._queryset.model._meta.pk.name
-        results = self._serializer(self._queryset, many=True).data
+        # We need to make a copy of the queryset by calling .all() as otherwise, the results will be
+        # cached inside the queryset and the query will not be executed on subsequent runs.
+        results = self._serializer(self._queryset.all(), many=True).data
         if self.status == QueryObserver.STATUS_STOPPED:
             return []
 
@@ -95,7 +119,8 @@ class QueryObserver(object):
         elif self.status == QueryObserver.STATUS_OBSERVING:
             self.emit(added, changed, removed)
 
-        return self._last_results.values()
+        if return_full:
+            return self._last_results.values()
 
     def emit(self, added, changed, removed):
         """
@@ -108,17 +133,30 @@ class QueryObserver(object):
 
         for subscriber in self._subscribers:
             # TODO
-            pass
+            print "would emit to %s: added=%s changed=%s removed=%s" % (subscriber, added, changed, removed)
 
     def subscribe(self, subscriber):
+        """
+        Adds a new subscriber.
+        """
+
         self._subscribers.add(subscriber)
 
     def unsubscribe(self, subscriber):
+        """
+        Unsubscribes a specific subscriber to this query observer. If no subscribers
+        are left, this query observer is stopped.
+        """
+
         self._subscribers.pop(subscriber)
         if not self._subscribers:
             self.stop()
 
     def stop(self):
+        """
+        Stops this query observer.
+        """
+
         self.status = QueryObserver.STATUS_STOPPED
 
         # Unregister all dependencies.
