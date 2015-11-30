@@ -4,10 +4,10 @@ from django.db.models import signals as model_signals
 
 from . import client
 from .pool import pool
-from resolwe.flow import models as flow_models, serializers as flow_serializers
+from resolwe.flow import models as flow_models, serializers as flow_serializers, views as flow_views
 
 # Register all the models with the query observer pool.
-pool.register_model(flow_models.Project, flow_serializers.ProjectSerializer)
+pool.register_model(flow_models.Project, flow_serializers.ProjectSerializer, flow_views.ProjectViewSet)
 
 # Setup model notifications.
 observer_client = client.QueryObserverClient()

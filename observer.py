@@ -1,6 +1,9 @@
 import collections
 import gevent
 from gevent import event
+import json
+
+from ws4redis import publisher, redis_store
 
 from . import exceptions
 
@@ -15,6 +18,10 @@ class QueryObserver(object):
     STATUS_INITIALIZING = 'initializing'
     STATUS_OBSERVING = 'observing'
     STATUS_STOPPED = 'stopped'
+
+    MESSAGE_ADDED = 'added'
+    MESSAGE_CHANGED = 'changed'
+    MESSAGE_REMOVED = 'removed'
 
     def __init__(self, pool, queryset):
         """
@@ -107,7 +114,7 @@ class QueryObserver(object):
             else:
                 old_row = self._last_results[row_id]
                 if row != old_row:
-                    changed.append((old_row, row))
+                    changed.append(row)
 
         self._last_results = new_results
 
@@ -131,9 +138,18 @@ class QueryObserver(object):
         :param removed: A list of rows that were removed
         """
 
-        for subscriber in self._subscribers:
-            # TODO
-            print "would emit to %s: added=%s changed=%s removed=%s" % (subscriber, added, changed, removed)
+        # TODO: Instead of duplicating messages to all subscribers, handle subscriptions within redis.
+        session_publisher = publisher.RedisPublisher(facility='queryobserver', sessions=list(self._subscribers))
+        for message_type, rows in (
+            (QueryObserver.MESSAGE_ADDED, added),
+            (QueryObserver.MESSAGE_CHANGED, changed),
+            (QueryObserver.MESSAGE_REMOVED, removed),
+        ):
+            for row in rows:
+                session_publisher.publish_message(redis_store.RedisMessage(json.dumps({
+                    'msg': message_type,
+                    'item': row,
+                })))
 
     def subscribe(self, subscriber):
         """

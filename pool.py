@@ -1,6 +1,6 @@
 import gevent
 
-from . import observer, exceptions
+from . import observer, exceptions, viewsets
 
 
 class QueryObserverPool(object):
@@ -19,18 +19,23 @@ class QueryObserverPool(object):
         self._queue = set()
         self._pending_process = False
 
-    def register_model(self, model, serializer):
+    def register_model(self, model, serializer, viewset=None):
         """
         Registers a new observable model.
 
         :param model: Model class
         :param serializer: Serializer class
+        :param viewset: Optional DRF viewset
         """
 
         if model in self._serializers:
             raise exceptions.SerializerAlreadyRegistered
 
         self._serializers[model] = serializer
+
+        # Patch viewset with our observable viewset mixin.
+        if viewset is not None:
+            viewset.__bases__ = (viewsets.ObservableViewSetMixin,) + viewset.__bases__
 
     def register_dependency(self, observer, table):
         """
