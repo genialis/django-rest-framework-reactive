@@ -1,5 +1,7 @@
 import gevent
 
+from django import db
+
 from . import observer, exceptions, viewsets
 
 
@@ -76,6 +78,7 @@ class QueryObserverPool(object):
 
         :param queryset: The queryset to observe
         :param subscriber: Channel identifier of the subscriber
+        :return: Query observer instance
         """
 
         query_observer = observer.QueryObserver(self, queryset)
@@ -89,7 +92,7 @@ class QueryObserverPool(object):
             self._observers[query_observer] = query_observer
 
         query_observer.subscribe(subscriber)
-        return query_observer.evaluate()
+        return query_observer
 
     def notify_update(self, table):
         """
@@ -121,8 +124,11 @@ class QueryObserverPool(object):
         queue = self._queue
         self._queue = set()
 
-        for observer in queue:
-            observer.evaluate(return_full=False)
+        try:
+            for observer in queue:
+                observer.evaluate(return_full=False)
+        finally:
+            db.close_old_connections()
 
 # Global pool instance.
 pool = QueryObserverPool()

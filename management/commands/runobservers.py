@@ -138,7 +138,12 @@ class WSGIObserverCommandHandler(pywsgi.WSGIServer):
         # Create a queryset back from the pickled query.
         queryset = query.model.objects.all()
         queryset.query = query
-        return pool.observe_queryset(queryset, subscriber)
+
+        observer = pool.observe_queryset(queryset, subscriber)
+        return {
+            'observer': observer.id,
+            'items': observer.evaluate(),
+        }
 
 
 class Command(base.BaseCommand):

@@ -39,6 +39,13 @@ class QueryObserver(object):
         self._subscribers = set()
         self._dependencies = set()
 
+        # Compute unique identifier for this observer based on the input queryset.
+        hasher = hashlib.sha256()
+        hasher.update(self._query[0])
+        for parameter in self._query[1]:
+            hasher.update(str(parameter))
+        self.id = hasher.hexdigest()
+
         # Ensure that the target model is registered with a specific serializer.
         self._serializer = pool.get_serializer(self._queryset.model)
 
@@ -148,6 +155,7 @@ class QueryObserver(object):
             for row in rows:
                 session_publisher.publish_message(redis_store.RedisMessage(json.dumps({
                     'msg': message_type,
+                    'observer': self.id,
                     'item': row,
                 })))
 
