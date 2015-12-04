@@ -80,6 +80,9 @@ class RedisObserverEventHandler(gevent.Greenlet):
     def event_table_remove(self, table):
         pool.notify_update(table)
 
+    def event_subscriber_gone(self, subscriber):
+        pool.remove_subscriber(subscriber)
+
 
 class WSGIObserverCommandHandler(pywsgi.WSGIServer):
     """
@@ -126,6 +129,16 @@ class WSGIObserverCommandHandler(pywsgi.WSGIServer):
         finally:
             db.close_old_connections()
 
+    def _get_queryset(self, query):
+        """
+        Returns a queryset given a query.
+        """
+
+        # Create a queryset back from the pickled query.
+        queryset = query.model.objects.all()
+        queryset.query = query
+        return queryset
+
     def command_create_observer(self, query, subscriber):
         """
         Starts observing a specific query.
@@ -135,15 +148,21 @@ class WSGIObserverCommandHandler(pywsgi.WSGIServer):
         :return: Serialized current query results
         """
 
-        # Create a queryset back from the pickled query.
-        queryset = query.model.objects.all()
-        queryset.query = query
-
-        observer = pool.observe_queryset(queryset, subscriber)
+        observer = pool.observe_queryset(self._get_queryset(query), subscriber)
         return {
             'observer': observer.id,
             'items': observer.evaluate(),
         }
+
+    def command_unsubscribe_observer(self, observer, subscriber):
+        """
+        Unsubscribes a specific subscriber from an observer.
+
+        :param observer: Query observer identifier
+        :param subscriber: Subscriber channel name
+        """
+
+        pool.unobserve_queryset(observer, subscriber)
 
 
 class Command(base.BaseCommand):

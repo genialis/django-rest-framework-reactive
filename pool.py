@@ -18,6 +18,7 @@ class QueryObserverPool(object):
         self._serializers = {}
         self._observers = {}
         self._tables = {}
+        self._subscribers = {}
         self._queue = set()
         self._pending_process = False
 
@@ -82,17 +83,52 @@ class QueryObserverPool(object):
         """
 
         query_observer = observer.QueryObserver(self, queryset)
-        if query_observer in self._observers:
-            existing = self._observers[query_observer]
+        if query_observer.id in self._observers:
+            existing = self._observers[query_observer.id]
             if not existing.stopped:
                 query_observer = existing
             else:
-                self._observers[query_observer] = query_observer
+                self._observers[query_observer.id] = query_observer
         else:
-            self._observers[query_observer] = query_observer
+            self._observers[query_observer.id] = query_observer
 
         query_observer.subscribe(subscriber)
+        self._subscribers.setdefault(subscriber, set()).add(query_observer)
         return query_observer
+
+    def unobserve_queryset(self, observer_id, subscriber):
+        """
+        Unsubscribes from observing a queryset.
+
+        :param observer_id: Query observer identifier
+        :param subscriber: Channel identifier of the subscriber
+        """
+
+        try:
+            query_observer = self._observers[observer_id]
+            query_observer.unsubscribe(subscriber)
+
+            # Update subscribers map.
+            observers = self._subscribers[subscriber]
+            observers.remove(query_observer)
+            if not observers:
+                del self._subscribers[subscriber]
+        except KeyError:
+            pass
+
+    def remove_subscriber(self, subscriber):
+        """
+        Removes a subscriber from all subscribed query observers.
+
+        :param subscriber: Channel identifier of the subscriber
+        """
+
+        try:
+            for observer in self._subscribers[subscriber]:
+                observer.unsubscribe(subscriber)
+            del self._subscribers[subscriber]
+        except KeyError:
+            pass
 
     def notify_update(self, table):
         """

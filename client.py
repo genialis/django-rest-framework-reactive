@@ -43,6 +43,16 @@ class QueryObserverClient(object):
 
         return self._request('create_observer', query=queryset.query, subscriber=subscriber)
 
+    def unsubscribe_observer(self, observer, subscriber):
+        """
+        Stops observing a specific query.
+
+        :param observer: Query observer identifier
+        :param subscriber: Subscriber channel name
+        """
+
+        return self._request('unsubscribe_observer', observer=observer, subscriber=subscriber)
+
     def _notify(self, event, **kwargs):
         """
         Event emission helper.
@@ -74,3 +84,10 @@ class QueryObserverClient(object):
         """
 
         return self._notify('table_remove', table=table)
+
+    def notify_subscriber_gone(self, subscriber):
+        """
+        Notifies the query observer that a subscriber has disconnected.
+        """
+
+        return self._notify('subscriber_gone', subscriber=subscriber)

@@ -2,6 +2,7 @@ import collections
 import gevent
 from gevent import event
 import json
+import hashlib
 
 from ws4redis import publisher, redis_store
 
@@ -35,6 +36,7 @@ class QueryObserver(object):
         self._pool = pool
         self._queryset = queryset.all()
         self._query = queryset.query.sql_with_params()
+        self.primary_key = self._queryset.model._meta.pk.name
         self._last_results = collections.OrderedDict()
         self._subscribers = set()
         self._dependencies = set()
@@ -97,7 +99,6 @@ class QueryObserver(object):
         # Evaluate the query (this operation yields).
         # TODO: Only compute difference between old and new, ideally on the SQL server using hashes.
         new_results = collections.OrderedDict()
-        primary_key = self._queryset.model._meta.pk.name
         # We need to make a copy of the queryset by calling .all() as otherwise, the results will be
         # cached inside the queryset and the query will not be executed on subsequent runs.
         results = self._serializer(self._queryset.all(), many=True).data
@@ -105,7 +106,7 @@ class QueryObserver(object):
             return []
 
         for row in results:
-            new_results[row[primary_key]] = row
+            new_results[row[self.primary_key]] = row
 
         # Process difference between old results and new results.
         added = []
@@ -146,18 +147,20 @@ class QueryObserver(object):
         """
 
         # TODO: Instead of duplicating messages to all subscribers, handle subscriptions within redis.
-        session_publisher = publisher.RedisPublisher(facility='queryobserver', sessions=list(self._subscribers))
         for message_type, rows in (
             (QueryObserver.MESSAGE_ADDED, added),
             (QueryObserver.MESSAGE_CHANGED, changed),
             (QueryObserver.MESSAGE_REMOVED, removed),
         ):
-            for row in rows:
-                session_publisher.publish_message(redis_store.RedisMessage(json.dumps({
-                    'msg': message_type,
-                    'observer': self.id,
-                    'item': row,
-                })))
+            for subscriber in self._subscribers:
+                session_publisher = publisher.RedisPublisher(facility=subscriber, broadcast=True)
+                for row in rows:
+                    session_publisher.publish_message(redis_store.RedisMessage(json.dumps({
+                        'msg': message_type,
+                        'observer': self.id,
+                        'primary_key': self.primary_key,
+                        'item': row,
+                    })))
 
     def subscribe(self, subscriber):
         """
@@ -172,7 +175,11 @@ class QueryObserver(object):
         are left, this query observer is stopped.
         """
 
-        self._subscribers.pop(subscriber)
+        try:
+            self._subscribers.remove(subscriber)
+        except KeyError:
+            pass
+
         if not self._subscribers:
             self.stop()
 
@@ -188,7 +195,7 @@ class QueryObserver(object):
             self._pool.unregister_dependency(self, dependency)
 
     def __eq__(self, other):
-        return self._query == other._query
+        return self.id == other.id
 
     def __hash__(self):
-        return hash(self._query)
+        return hash(self.id)
