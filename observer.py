@@ -4,6 +4,8 @@ from gevent import event
 import json
 import hashlib
 
+from django.db.models import query as django_query
+
 from ws4redis import publisher, redis_store
 
 from . import exceptions
@@ -35,7 +37,15 @@ class QueryObserver(object):
         self.status = QueryObserver.STATUS_NEW
         self._pool = pool
         self._queryset = queryset.all()
-        self._query = queryset.query.sql_with_params()
+
+        try:
+            self._query = queryset.query.sql_with_params()
+        except django_query.EmptyResultSet:
+            # Queries which always return an empty result set, regardless of when they are
+            # executed, must be handled specially as they do not produce any valid SQL statements
+            # and as such, they cannot be observed and will always be mapped to this same observer.
+            self._query = ('', ())
+
         self.primary_key = self._queryset.model._meta.pk.name
         self._last_results = collections.OrderedDict()
         self._subscribers = set()
