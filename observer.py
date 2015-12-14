@@ -82,12 +82,13 @@ class QueryObserver(object):
 
         return self.status == QueryObserver.STATUS_STOPPED
 
-    def evaluate(self, return_full=True):
+    def evaluate(self, return_full=True, return_emitted=False):
         """
         Evaluates the query observer and checks if there have been any changes. This function
         may yield.
 
         :param return_full: True if the full set of rows should be returned
+        :param return_emitted: True if the emitted diffs should be returned
         """
 
         if self.status == QueryObserver.STATUS_STOPPED:
@@ -144,6 +145,9 @@ class QueryObserver(object):
         elif self.status == QueryObserver.STATUS_OBSERVING:
             self.emit(added, changed, removed)
 
+            if return_emitted:
+                return (added, changed, removed)
+
         if return_full:
             return self._last_results.values()
 
@@ -197,6 +201,9 @@ class QueryObserver(object):
         """
         Stops this query observer.
         """
+
+        if self.status == QueryObserver.STATUS_STOPPED:
+            return
 
         self.status = QueryObserver.STATUS_STOPPED
 

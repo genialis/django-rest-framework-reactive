@@ -116,6 +116,17 @@ class QueryObserverPool(object):
         except KeyError:
             pass
 
+    def stop_all(self):
+        """
+        Stops all query observers.
+        """
+
+        for observer in self._observers.values():
+            observer.stop()
+
+        self._observers = {}
+        self._subscribers = {}
+
     def remove_subscriber(self, subscriber):
         """
         Removes a subscriber from all subscribed query observers.
