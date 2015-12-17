@@ -150,3 +150,53 @@ class QueryObserversTestCase(test.TestCase):
         self.assertEquals(len(items), 0)
         self.assertIn(observer, pool._tables['queryobserver_exampleitem'])
         self.assertIn(observer, pool._tables['queryobserver_examplesubitem'])
+
+    def test_order(self):
+        queryset = models.ExampleItem.objects.all().order_by('name')
+        observer = pool.observe_queryset(queryset, 'test-subscriber')
+        items = observer.evaluate()
+
+        self.assertEquals(len(items), 0)
+
+        item = models.ExampleItem()
+        item.name = 'D'
+        item.enabled = False
+        item.save()
+
+        added, changed, removed = observer.evaluate(return_emitted=True)
+
+        self.assertEquals(len(added), 1)
+        self.assertEquals(added[0], {'id': item.pk, 'name': item.name, 'enabled': item.enabled})
+        self.assertEquals(added[0]._order, 0)
+        self.assertEquals(len(changed), 0)
+        self.assertEquals(len(removed), 0)
+
+        item2 = models.ExampleItem()
+        item2.name = 'A'
+        item2.enabled = True
+        item2.save()
+
+        added, changed, removed = observer.evaluate(return_emitted=True)
+
+        self.assertEquals(len(added), 1)
+        self.assertEquals(added[0], {'id': item2.pk, 'name': item2.name, 'enabled': item2.enabled})
+        self.assertEquals(added[0]._order, 0)
+        # Check that the first item has changed, because its order has changed.
+        self.assertEquals(len(changed), 1)
+        self.assertEquals(changed[0], {'id': item.pk, 'name': item.name, 'enabled': item.enabled})
+        self.assertEquals(changed[0]._order, 1)
+        self.assertEquals(len(removed), 0)
+
+        item3 = models.ExampleItem()
+        item3.name = 'C'
+        item3.enabled = True
+        item3.save()
+
+        added, changed, removed = observer.evaluate(return_emitted=True)
+        self.assertEquals(len(added), 1)
+        self.assertEquals(added[0], {'id': item3.pk, 'name': item3.name, 'enabled': item3.enabled})
+        self.assertEquals(added[0]._order, 1)
+        self.assertEquals(len(changed), 1)
+        self.assertEquals(changed[0], {'id': item.pk, 'name': item.name, 'enabled': item.enabled})
+        self.assertEquals(changed[0]._order, 2)
+        self.assertEquals(len(removed), 0)

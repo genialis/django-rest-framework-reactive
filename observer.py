@@ -116,7 +116,8 @@ class QueryObserver(object):
         if self.status == QueryObserver.STATUS_STOPPED:
             return []
 
-        for row in results:
+        for order, row in enumerate(results):
+            row._order = order
             new_results[row[self.primary_key]] = row
 
         # Process difference between old results and new results.
@@ -133,6 +134,8 @@ class QueryObserver(object):
             else:
                 old_row = self._last_results[row_id]
                 if row != old_row:
+                    changed.append(row)
+                if row._order != old_row._order:
                     changed.append(row)
 
         self._last_results = new_results
@@ -173,6 +176,7 @@ class QueryObserver(object):
                         'msg': message_type,
                         'observer': self.id,
                         'primary_key': self.primary_key,
+                        'order': getattr(row, '_order', None),
                         'item': row,
                     })))
 
