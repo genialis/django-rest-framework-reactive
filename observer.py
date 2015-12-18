@@ -1,5 +1,4 @@
 import collections
-import gevent
 from gevent import event
 import json
 import hashlib

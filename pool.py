@@ -1,5 +1,3 @@
-import gevent
-
 from django import db
 
 from . import observer, exceptions, viewsets
@@ -9,6 +7,9 @@ class QueryObserverPool(object):
     """
     A pool of query observers.
     """
+
+    # Callable for deferring execution (for example gevent.spawn).
+    spawner = lambda function: function()
 
     def __init__(self):
         """
@@ -160,7 +161,7 @@ class QueryObserverPool(object):
         if self._pending_process:
             return
         self._pending_process = True
-        gevent.spawn(self._process_notifications)
+        self.spawner(self._process_notifications)
 
     def _process_notifications(self):
         """
