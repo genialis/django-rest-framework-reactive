@@ -32,7 +32,11 @@ class RedisObserverEventHandler(object):
         self._pubsub = self._redis.pubsub(ignore_subscribe_messages=True)
         self._pubsub.subscribe(connection.QUERYOBSERVER_REDIS_CHANNEL)
 
-        for event in self._pubsub.listen():
+        while self._pubsub.subscribed:
+            event = self._pubsub.get_message(ignore_subscribe_messages=True, timeout=0.1)
+            if not event:
+                continue
+
             # Events are assumed to be pickled data.
             try:
                 event = pickle.loads(event['data'])
@@ -58,6 +62,12 @@ class RedisObserverEventHandler(object):
                 logger.error(traceback.format_exc())
             finally:
                 db.close_old_connections()
+
+        self._pubsub.close()
+
+    def shutdown(self):
+        self._pubsub.unsubscribe()
+        self._pubsub.punsubscribe()
 
     def event_table_insert(self, table):
         pool.notify_update(table)
@@ -91,8 +101,10 @@ class WSGIObserverCommandHandler(object):
         Handles an incoming RPC request.
         """
 
+        content_length = int(environ['CONTENT_LENGTH'])
+
         try:
-            request = pickle.loads(environ['wsgi.input'].read())
+            request = pickle.loads(environ['wsgi.input'].read(content_length))
             if not isinstance(request, dict):
                 raise ValueError
 
