@@ -1,5 +1,5 @@
-# TODO: This should be moved to a separate application.
 from django import dispatch
+from django.db import transaction
 from django.db.models import signals as model_signals
 
 from . import client
@@ -7,6 +7,7 @@ from .pool import pool
 from resolwe.flow import models as flow_models, serializers as flow_serializers, views as flow_views
 
 # Register all the models with the query observer pool.
+# TODO: This should be moved to a separate application.
 pool.register_model(flow_models.Project, flow_serializers.ProjectSerializer, flow_views.ProjectViewSet)
 
 # Setup model notifications.
@@ -23,11 +24,14 @@ def model_post_save(sender, instance, created=False, **kwargs):
     :param created: True if a new row was created
     """
 
-    table = sender._meta.db_table
-    if created:
-        observer_client.notify_table_insert(table)
-    else:
-        observer_client.notify_table_update(table)
+    def notify():
+        table = sender._meta.db_table
+        if created:
+            observer_client.notify_table_insert(table)
+        else:
+            observer_client.notify_table_update(table)
+
+    transaction.on_commit(notify)
 
 
 @dispatch.receiver(model_signals.post_delete)
@@ -39,5 +43,8 @@ def model_post_delete(sender, instance, **kwargs):
     :param instance: The actual instance that was removed
     """
 
-    table = sender._meta.db_table
-    observer_client.notify_table_remove(table)
+    def notify():
+        table = sender._meta.db_table
+        observer_client.notify_table_remove(table)
+
+    transaction.on_commit(notify)

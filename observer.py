@@ -1,5 +1,4 @@
 import collections
-from gevent import event
 import json
 import hashlib
 
@@ -49,6 +48,7 @@ class QueryObserver(object):
         self._last_results = collections.OrderedDict()
         self._subscribers = set()
         self._dependencies = set()
+        self._initialization_future = None
 
         # Compute unique identifier for this observer based on the input queryset.
         hasher = hashlib.sha256()
@@ -98,7 +98,8 @@ class QueryObserver(object):
         if self.status == QueryObserver.STATUS_INITIALIZING:
             self._initialization_future.wait()
         elif self.status == QueryObserver.STATUS_NEW:
-            self._initialization_future = event.Event()
+            if self._pool.future_class is not None:
+                self._initialization_future = self._pool.future_class()
             self.status = QueryObserver.STATUS_INITIALIZING
 
             # Determine which tables this query depends on.
@@ -141,9 +142,10 @@ class QueryObserver(object):
 
         if self.status == QueryObserver.STATUS_INITIALIZING:
             self.status = QueryObserver.STATUS_OBSERVING
-            future = self._initialization_future
-            self._initialization_future = None
-            future.set()
+            if self._initialization_future is not None:
+                future = self._initialization_future
+                self._initialization_future = None
+                future.set()
         elif self.status == QueryObserver.STATUS_OBSERVING:
             self.emit(added, changed, removed)
 

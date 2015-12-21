@@ -1,6 +1,6 @@
 import gevent
 import gevent.monkey
-from gevent import pywsgi
+from gevent import pywsgi, event
 import psycogreen.gevent
 
 # Patch the I/O primitives and psycopg2 database driver to be greenlet-enabled.
@@ -32,6 +32,7 @@ class Command(base.BaseCommand):
 
         # Make the pool gevent-ready.
         pool.spawner = gevent.spawn
+        pool.future_class = event.Event
 
         # Register the event handler for receiving model updates from the Django ORM.
         event_handler = rpc.RedisObserverEventHandler()

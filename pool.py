@@ -25,11 +25,13 @@ class QueryObserverPool(object):
     """
 
     # Callable for deferring execution (for example gevent.spawn).
-    spawner = lambda function: function()
+    spawner = lambda self, function: function()
     # Mutex for serializing access to the query observer pool. By default, a
     # dummy implementation that does no locking is used as multi-threaded
     # operation is only used during tests.
     lock = None
+    # Future class.
+    future_class = None
 
     def __init__(self):
         """
