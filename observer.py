@@ -1,6 +1,7 @@
 import collections
 import json
 import hashlib
+import traceback
 
 from django.db.models import query as django_query
 
@@ -24,12 +25,13 @@ class QueryObserver(object):
     MESSAGE_CHANGED = 'changed'
     MESSAGE_REMOVED = 'removed'
 
-    def __init__(self, pool, queryset):
+    def __init__(self, pool, queryset, filters=None):
         """
         Creates a new query observer.
 
         :param pool: QueryObserverPool instance
         :param queryset: A QuerySet that should be observed
+        :param filters: An optional list of filters to apply after the query
         """
 
         self.status = QueryObserver.STATUS_NEW
@@ -48,13 +50,23 @@ class QueryObserver(object):
         self._last_results = collections.OrderedDict()
         self._subscribers = set()
         self._dependencies = set()
+        self._filters = filters or []
         self._initialization_future = None
 
-        # Compute unique identifier for this observer based on the input queryset.
+        # Compute unique identifier for this observer based on the input queryset and filters.
         hasher = hashlib.sha256()
         hasher.update(self._query[0])
         for parameter in self._query[1]:
             hasher.update(str(parameter))
+        for filter_function, kwargs, queryset_kwarg in self._filters:
+            hasher.update(filter_function.__module__)
+            hasher.update(filter_function.__name__)
+            hasher.update(queryset_kwarg)
+            for key, value in kwargs.items():
+                hasher.update(key)
+                hasher.update(value.__class__.__module__)
+                hasher.update(value.__class__.__name__)
+                hasher.update(str(hash(value)))
         self.id = hasher.hexdigest()
 
         # Ensure that the target model is registered with a specific serializer.
@@ -112,7 +124,17 @@ class QueryObserver(object):
         new_results = collections.OrderedDict()
         # We need to make a copy of the queryset by calling .all() as otherwise, the results will be
         # cached inside the queryset and the query will not be executed on subsequent runs.
-        results = self._serializer(self._queryset.all(), many=True).data
+        queryset = self._queryset.all()
+        # Apply all filters in order.
+        for filter_function, kwargs, queryset_kwarg in self._filters:
+            kwargs[queryset_kwarg] = queryset
+            try:
+                queryset = filter_function(**kwargs)
+            except:
+                traceback.print_exc()
+                return []
+
+        results = self._serializer(queryset, many=True).data
         if self.status == QueryObserver.STATUS_STOPPED:
             return []
 

@@ -140,16 +140,17 @@ class WSGIObserverCommandHandler(object):
         queryset.query = query
         return queryset
 
-    def command_create_observer(self, query, subscriber):
+    def command_create_observer(self, query, subscriber, filters):
         """
         Starts observing a specific query.
 
         :param query: Query instance to observe
         :param subscriber: Subscriber channel name
+        :param filters: An optional list of filters to apply after the query
         :return: Serialized current query results
         """
 
-        observer = pool.observe_queryset(self._get_queryset(query), subscriber)
+        observer = pool.observe_queryset(self._get_queryset(query), subscriber, filters)
         return {
             'observer': observer.id,
             'items': observer.evaluate(),

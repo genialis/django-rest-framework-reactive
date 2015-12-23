@@ -1,3 +1,5 @@
+import traceback
+
 from django import db
 
 from . import observer, exceptions, viewsets
@@ -101,16 +103,17 @@ class QueryObserverPool(object):
             raise exceptions.SerializerNotRegistered
 
     @serializable
-    def observe_queryset(self, queryset, subscriber):
+    def observe_queryset(self, queryset, subscriber, filters=None):
         """
         Subscribes to observing of a queryset.
 
         :param queryset: The queryset to observe
         :param subscriber: Channel identifier of the subscriber
+        :param filters: An optional list of filters to apply after the query
         :return: Query observer instance
         """
 
-        query_observer = observer.QueryObserver(self, queryset)
+        query_observer = observer.QueryObserver(self, queryset, filters)
         if query_observer.id in self._observers:
             existing = self._observers[query_observer.id]
             if not existing.stopped:
@@ -209,7 +212,10 @@ class QueryObserverPool(object):
 
         try:
             for observer in queue:
-                observer.evaluate(return_full=False)
+                try:
+                    observer.evaluate(return_full=False)
+                except:
+                    traceback.print_exc()
         finally:
             db.close_old_connections()
 

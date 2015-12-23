@@ -32,16 +32,17 @@ class QueryObserverClient(object):
             data=pickle.dumps(kwargs),
         ).json()
 
-    def create_observer(self, queryset, subscriber):
+    def create_observer(self, queryset, subscriber, filters=None):
         """
         Starts observing a specific query.
 
         :param query: QuerySet instance to observe
         :param subscriber: Subscriber channel name
+        :param filters: An optional list of filters to apply after the query
         :return: Serialized current query results
         """
 
-        return self._request('create_observer', query=queryset.query, subscriber=subscriber)
+        return self._request('create_observer', query=queryset.query, subscriber=subscriber, filters=filters)
 
     def unsubscribe_observer(self, observer, subscriber):
         """
