@@ -1,11 +1,15 @@
 import gevent
 import gevent.monkey
+import gevent.select
 from gevent import pywsgi, event
 import psycogreen.gevent
 
 # Patch the I/O primitives and psycopg2 database driver to be greenlet-enabled.
 gevent.monkey.patch_all(thread=False)
 psycogreen.gevent.patch_psycopg()
+
+import redis.connection
+redis.connection.select = gevent.select.select
 
 from django import db
 from django.core import exceptions
