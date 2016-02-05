@@ -21,4 +21,4 @@ class ExampleSubItemViewSet(mixins.RetrieveModelMixin,
 
     queryset = models.ExampleSubItem.objects.all()
     serializer_class = serializers.ExampleSubItemSerializer
-    filter_fields = ('enabled')
+    filter_fields = ('parent__enabled', 'enabled')

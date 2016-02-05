@@ -130,27 +130,16 @@ class WSGIObserverCommandHandler(object):
         finally:
             db.close_old_connections()
 
-    def _get_queryset(self, query):
+    def command_create_observer(self, request, subscriber):
         """
-        Returns a queryset given a query.
-        """
+        Starts observing a specific viewset.
 
-        # Create a queryset back from the pickled query.
-        queryset = query.model.objects.db_manager(self.database).all()
-        queryset.query = query
-        return queryset
-
-    def command_create_observer(self, query, subscriber, filters):
-        """
-        Starts observing a specific query.
-
-        :param query: Query instance to observe
+        :param request: The `queryobservers.request.Request` to observe
         :param subscriber: Subscriber channel name
-        :param filters: An optional list of filters to apply after the query
         :return: Serialized current query results
         """
 
-        observer = pool.observe_queryset(self._get_queryset(query), subscriber, filters)
+        observer = pool.observe_viewset(request, subscriber)
         return {
             'observer': observer.id,
             'items': observer.evaluate(),
@@ -164,4 +153,4 @@ class WSGIObserverCommandHandler(object):
         :param subscriber: Subscriber channel name
         """
 
-        pool.unobserve_queryset(observer, subscriber)
+        pool.unobserve_viewset(observer, subscriber)

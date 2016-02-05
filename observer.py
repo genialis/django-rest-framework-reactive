@@ -1,18 +1,47 @@
 import collections
+import contextlib
 import json
 import hashlib
 import traceback
+import types
 
+from django.core import exceptions as django_exceptions
 from django.db.models import query as django_query
+from django.db.models.sql import compiler
 
+from rest_framework import request as api_request
 from ws4redis import publisher, redis_store
 
-from . import exceptions
+from . import exceptions, request as observer_request
+
+
+@contextlib.contextmanager
+def intercept_queries(pool, tables):
+    # Monkey patch the SQLCompiler class to get all the referenced tables in a code block.
+    thread_id = pool.thread_id()
+    original_execute_sql = compiler.SQLCompiler.execute_sql
+
+    def execute_sql(self, *args, **kwargs):
+        try:
+            return original_execute_sql(self, *args, **kwargs)
+        finally:
+            # Ignore intercepts from other threads when running in a multi-threaded context.
+            if pool.thread_id() == thread_id:
+                tables.update(self.query.tables)
+
+    compiler.SQLCompiler.execute_sql = types.MethodType(execute_sql, None, compiler.SQLCompiler)
+
+    # Run the code block.
+    yield
+
+    # Restore the original get_compiler.
+    assert compiler.SQLCompiler.execute_sql.im_func is execute_sql
+    compiler.SQLCompiler.execute_sql = original_execute_sql
 
 
 class QueryObserver(object):
     """
-    A query observer observes a specific queryset for changes and propagates these
+    A query observer observes a specific viewset for changes and propagates these
     changes to all interested subscribers.
     """
 
@@ -25,52 +54,29 @@ class QueryObserver(object):
     MESSAGE_CHANGED = 'changed'
     MESSAGE_REMOVED = 'removed'
 
-    def __init__(self, pool, queryset, filters=None):
+    def __init__(self, pool, request):
         """
         Creates a new query observer.
 
         :param pool: QueryObserverPool instance
-        :param queryset: A QuerySet that should be observed
-        :param filters: An optional list of filters to apply after the query
+        :param request: A `queryobserver.request.Request` instance
         """
 
         self.status = QueryObserver.STATUS_NEW
         self._pool = pool
-        self._queryset = queryset.all()
 
-        try:
-            self._query = queryset.query.sql_with_params()
-        except django_query.EmptyResultSet:
-            # Queries which always return an empty result set, regardless of when they are
-            # executed, must be handled specially as they do not produce any valid SQL statements
-            # and as such, they cannot be observed and will always be mapped to this same observer.
-            self._query = ('', ())
+        # Obtain a serializer by asking the viewset to provide one. We instantiate the
+        # viewset with a fake request, so that the viewset methods work as expected.
+        viewset = request.viewset_class()
+        viewset.request = api_request.Request(request)
+        self._viewset = viewset
+        self._serializer = viewset.get_serializer_class()
 
-        self.primary_key = self._queryset.model._meta.pk.name
         self._last_results = collections.OrderedDict()
         self._subscribers = set()
         self._dependencies = set()
-        self._filters = filters or []
         self._initialization_future = None
-
-        # Compute unique identifier for this observer based on the input queryset and filters.
-        hasher = hashlib.sha256()
-        hasher.update(self._query[0])
-        for parameter in self._query[1]:
-            hasher.update(str(parameter))
-        for filter_function, kwargs, queryset_kwarg in self._filters:
-            hasher.update(filter_function.__module__)
-            hasher.update(filter_function.__name__)
-            hasher.update(queryset_kwarg)
-            for key, value in kwargs.items():
-                hasher.update(key)
-                hasher.update(value.__class__.__module__)
-                hasher.update(value.__class__.__name__)
-                hasher.update(str(hash(value)))
-        self.id = hasher.hexdigest()
-
-        # Ensure that the target model is registered with a specific serializer.
-        self._serializer = pool.get_serializer(self._queryset.model)
+        self.id = request.observe_id
 
     def add_dependency(self, table):
         """
@@ -114,27 +120,25 @@ class QueryObserver(object):
                 self._initialization_future = self._pool.future_class()
             self.status = QueryObserver.STATUS_INITIALIZING
 
-            # Determine which tables this query depends on.
-            for table in self._queryset.query.tables:
-                self.add_dependency(table)
-            self.add_dependency(self._queryset.model._meta.db_table)
-
         # Evaluate the query (this operation yields).
+        tables = set()
+        with intercept_queries(self._pool, tables):
+            try:
+                queryset = self._viewset.filter_queryset(self._viewset.get_queryset())
+                results = self._serializer(queryset, many=True).data
+            except django_exceptions.ObjectDoesNotExist:
+                # The evaluation may fail when certain dependent objects (like users) are removed
+                # from the database. In this case, the observer is stopped.
+                return self.stop()
+
+        # Register table dependencies.
+        for table in tables:
+            self.add_dependency(table)
+        self.primary_key = queryset.model._meta.pk.name
+
         # TODO: Only compute difference between old and new, ideally on the SQL server using hashes.
         new_results = collections.OrderedDict()
-        # We need to make a copy of the queryset by calling .all() as otherwise, the results will be
-        # cached inside the queryset and the query will not be executed on subsequent runs.
-        queryset = self._queryset.all()
-        # Apply all filters in order.
-        for filter_function, kwargs, queryset_kwarg in self._filters:
-            kwargs[queryset_kwarg] = queryset
-            try:
-                queryset = filter_function(**kwargs)
-            except:
-                traceback.print_exc()
-                return []
 
-        results = self._serializer(queryset, many=True).data
         if self.status == QueryObserver.STATUS_STOPPED:
             return []
 
@@ -237,6 +241,12 @@ class QueryObserver(object):
         # Unregister all dependencies.
         for dependency in self._dependencies:
             self._pool.unregister_dependency(self, dependency)
+
+        # Unsubscribe all subscribers.
+        for subscriber in self._subscribers:
+            self._pool._remove_subscriber(self, subscriber)
+
+        self._pool._remove_observer(self)
 
     def __eq__(self, other):
         return self.id == other.id

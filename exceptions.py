@@ -4,11 +4,11 @@ class QueryObserverException(Exception):
     pass
 
 
-class SerializerAlreadyRegistered(QueryObserverException):
+class ViewSetAlreadyRegistered(QueryObserverException):
     pass
 
 
-class SerializerNotRegistered(QueryObserverException):
+class ViewSetNotRegistered(QueryObserverException):
     pass
 
 

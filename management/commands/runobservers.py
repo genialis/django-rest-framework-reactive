@@ -37,6 +37,7 @@ class Command(base.BaseCommand):
         # Make the pool gevent-ready.
         pool.spawner = gevent.spawn
         pool.future_class = event.Event
+        pool.thread_id = gevent.getcurrent
 
         # Register the event handler for receiving model updates from the Django ORM.
         event_handler = rpc.RedisObserverEventHandler()

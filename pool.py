@@ -34,13 +34,15 @@ class QueryObserverPool(object):
     lock = None
     # Future class.
     future_class = None
+    # Current thread id.
+    thread_id = lambda self: None
 
     def __init__(self):
         """
         Creates a new query observer pool.
         """
 
-        self._serializers = {}
+        self._viewsets = set()
         self._observers = {}
         self._tables = {}
         self._subscribers = {}
@@ -48,23 +50,19 @@ class QueryObserverPool(object):
         self._pending_process = False
 
     @serializable
-    def register_model(self, model, serializer, viewset=None):
+    def register_viewset(self, viewset):
         """
-        Registers a new observable model.
+        Registers a new observable viewset.
 
-        :param model: Model class
-        :param serializer: Serializer class
-        :param viewset: Optional DRF viewset
+        :param viewset: DRF viewset
         """
 
-        if model in self._serializers:
-            raise exceptions.SerializerAlreadyRegistered
-
-        self._serializers[model] = serializer
+        if viewset in self._viewsets:
+            raise exceptions.ViewSetAlreadyRegistered
+        self._viewsets.add(viewset)
 
         # Patch viewset with our observable viewset mixin.
-        if viewset is not None:
-            viewset.__bases__ = (viewsets.ObservableViewSetMixin,) + viewset.__bases__
+        viewset.__bases__ = (viewsets.ObservableViewSetMixin,) + viewset.__bases__
 
     @serializable
     def register_dependency(self, observer, table):
@@ -89,31 +87,16 @@ class QueryObserverPool(object):
         self._tables[table].remove(observer)
 
     @serializable
-    def get_serializer(self, model):
+    def observe_viewset(self, request, subscriber):
         """
-        Returns a registered model serializer.
+        Subscribes to observing of a viewset.
 
-        :param model: Model class
-        :return: Serializer instance
-        """
-
-        try:
-            return self._serializers[model]
-        except KeyError:
-            raise exceptions.SerializerNotRegistered
-
-    @serializable
-    def observe_queryset(self, queryset, subscriber, filters=None):
-        """
-        Subscribes to observing of a queryset.
-
-        :param queryset: The queryset to observe
+        :param request: The `queryobservers.request.Request` to observe
         :param subscriber: Channel identifier of the subscriber
-        :param filters: An optional list of filters to apply after the query
         :return: Query observer instance
         """
 
-        query_observer = observer.QueryObserver(self, queryset, filters)
+        query_observer = observer.QueryObserver(self, request)
         if query_observer.id in self._observers:
             existing = self._observers[query_observer.id]
             if not existing.stopped:
@@ -128,9 +111,9 @@ class QueryObserverPool(object):
         return query_observer
 
     @serializable
-    def unobserve_queryset(self, observer_id, subscriber):
+    def unobserve_viewset(self, observer_id, subscriber):
         """
-        Unsubscribes from observing a queryset.
+        Unsubscribes from observing a viewset.
 
         :param observer_id: Query observer identifier
         :param subscriber: Channel identifier of the subscriber
@@ -141,12 +124,18 @@ class QueryObserverPool(object):
             query_observer.unsubscribe(subscriber)
 
             # Update subscribers map.
-            observers = self._subscribers[subscriber]
-            observers.remove(query_observer)
-            if not observers:
-                del self._subscribers[subscriber]
+            self._remove_subscriber(query_observer, subscriber)
         except KeyError:
             pass
+
+    def _remove_subscriber(self, observer, subscriber):
+        observers = self._subscribers[subscriber]
+        observers.remove(observer)
+        if not observers:
+            del self._subscribers[subscriber]
+
+    def _remove_observer(self, observer):
+        del self._observers[observer.id]
 
     @serializable
     def stop_all(self):

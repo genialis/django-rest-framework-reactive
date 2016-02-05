@@ -6,10 +6,10 @@ from . import client
 from .pool import pool
 from resolwe.flow import models as flow_models, serializers as flow_serializers, views as flow_views
 
-# Register all the models with the query observer pool.
+# Register all viewsets with the query observer pool.
 # TODO: This should be moved to a separate application.
-pool.register_model(flow_models.Project, flow_serializers.ProjectSerializer, flow_views.ProjectViewSet)
-pool.register_model(flow_models.Data, flow_serializers.DataSerializer, flow_views.DataViewSet)
+pool.register_viewset(flow_views.ProjectViewSet)
+pool.register_viewset(flow_views.DataViewSet)
 
 # Setup model notifications.
 observer_client = client.QueryObserverClient()
