@@ -5,7 +5,7 @@ from gevent import pywsgi, event
 import psycogreen.gevent
 
 # Patch the I/O primitives and psycopg2 database driver to be greenlet-enabled.
-gevent.monkey.patch_all(thread=False)
+gevent.monkey.patch_all()
 psycogreen.gevent.patch_psycopg()
 
 import redis.connection
@@ -28,10 +28,7 @@ class Command(base.BaseCommand):
 
     def handle(self, *args, **options):
         # Check if we are using the correct database engine configuration.
-        if 'queryobservers' not in db.connections:
-            raise exceptions.ImproperlyConfigured("Database configuration named 'queryobservers' must be configured.")
-
-        if db.connections['queryobservers'].settings_dict['ENGINE'] != 'django_db_geventpool.backends.postgresql_psycopg2':
+        if db.connection.settings_dict['ENGINE'] != 'django_db_geventpool.backends.postgresql_psycopg2':
             raise exceptions.ImproperlyConfigured("Query observers require the geventpool database engine.")
 
         # Make the pool gevent-ready.
@@ -45,5 +42,5 @@ class Command(base.BaseCommand):
 
         # Prepare the RPC server.
         info = connection.get_queryobserver_settings()
-        rpc_server = pywsgi.WSGIServer((info['host'], info['port']), application=rpc.WSGIObserverCommandHandler(database='queryobservers'))
+        rpc_server = pywsgi.WSGIServer((info['host'], info['port']), application=rpc.WSGIObserverCommandHandler())
         rpc_server.serve_forever()

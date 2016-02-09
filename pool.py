@@ -1,6 +1,9 @@
+import contextlib
 import traceback
+import types
 
 from django import db
+from django.db.models.sql import compiler
 
 from . import observer, exceptions, viewsets
 
@@ -19,6 +22,68 @@ def serializable(function):
             return function(self, *args, **kwargs)
 
     return wrapper
+
+
+class QueryInterceptor(object):
+    def __init__(self, pool):
+        self.pool = pool
+        self.intercepting_queries = 0
+        self.tables = {}
+
+    def _thread_id(self):
+        return id(self.pool.thread_id())
+
+    def _patch(self):
+        """
+        Monkey patch the SQLCompiler class to get all the referenced tables in a code block.
+        """
+
+        self.intercepting_queries += 1
+        if self.intercepting_queries > 1:
+            return
+
+        self._original_execute_sql = compiler.SQLCompiler.execute_sql
+
+        def execute_sql(compiler, *args, **kwargs):
+            try:
+                return self._original_execute_sql(compiler, *args, **kwargs)
+            finally:
+                self.tables.setdefault(self._thread_id(), set()).update(compiler.query.tables)
+
+        compiler.SQLCompiler.execute_sql = types.MethodType(execute_sql, None, compiler.SQLCompiler)
+
+    def _unpatch(self):
+        """
+        Restore SQLCompiler monkey patches.
+        """
+
+        self.intercepting_queries -= 1
+        assert self.intercepting_queries >= 0
+
+        if self.intercepting_queries:
+            return
+
+        compiler.SQLCompiler.execute_sql = self._original_execute_sql
+
+    @contextlib.contextmanager
+    def intercept(self, tables):
+        """
+        Intercepts all tables used inside a codeblock.
+
+        :param tables: Output tables set
+        """
+
+        self._patch()
+
+        try:
+            # Run the code block.
+            yield
+        finally:
+            self._unpatch()
+
+            if self._thread_id() in self.tables:
+                tables.update(self.tables[self._thread_id()])
+                del self.tables[self._thread_id()]
 
 
 class QueryObserverPool(object):
@@ -48,6 +113,7 @@ class QueryObserverPool(object):
         self._subscribers = {}
         self._queue = set()
         self._pending_process = False
+        self.query_interceptor = QueryInterceptor(self)
 
     @serializable
     def register_viewset(self, viewset):

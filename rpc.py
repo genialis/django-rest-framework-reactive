@@ -87,15 +87,6 @@ class WSGIObserverCommandHandler(object):
     A WSGI-based RPC server for the query observer API.
     """
 
-    def __init__(self, database):
-        """
-        Constructs a new WSGI server for handling query observer RPC.
-
-        :param database: Database configuration to use for queries
-        """
-
-        self.database = database
-
     def __call__(self, environ, start_response):
         """
         Handles an incoming RPC request.

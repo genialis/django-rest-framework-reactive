@@ -1,42 +1,15 @@
 import collections
-import contextlib
 import json
 import hashlib
 import traceback
-import types
 
 from django.core import exceptions as django_exceptions
 from django.db.models import query as django_query
-from django.db.models.sql import compiler
 
 from rest_framework import request as api_request
 from ws4redis import publisher, redis_store
 
 from . import exceptions, request as observer_request
-
-
-@contextlib.contextmanager
-def intercept_queries(pool, tables):
-    # Monkey patch the SQLCompiler class to get all the referenced tables in a code block.
-    thread_id = pool.thread_id()
-    original_execute_sql = compiler.SQLCompiler.execute_sql
-
-    def execute_sql(self, *args, **kwargs):
-        try:
-            return original_execute_sql(self, *args, **kwargs)
-        finally:
-            # Ignore intercepts from other threads when running in a multi-threaded context.
-            if pool.thread_id() == thread_id:
-                tables.update(self.query.tables)
-
-    compiler.SQLCompiler.execute_sql = types.MethodType(execute_sql, None, compiler.SQLCompiler)
-
-    # Run the code block.
-    yield
-
-    # Restore the original get_compiler.
-    assert compiler.SQLCompiler.execute_sql.im_func is execute_sql
-    compiler.SQLCompiler.execute_sql = original_execute_sql
 
 
 class QueryObserver(object):
@@ -122,14 +95,19 @@ class QueryObserver(object):
 
         # Evaluate the query (this operation yields).
         tables = set()
-        with intercept_queries(self._pool, tables):
+        stop_observer = False
+        with self._pool.query_interceptor.intercept(tables):
             try:
                 queryset = self._viewset.filter_queryset(self._viewset.get_queryset())
                 results = self._serializer(queryset, many=True).data
             except django_exceptions.ObjectDoesNotExist:
                 # The evaluation may fail when certain dependent objects (like users) are removed
                 # from the database. In this case, the observer is stopped.
-                return self.stop()
+                stop_observer = True
+
+        if stop_observer:
+            self.stop()
+            return []
 
         # Register table dependencies.
         for table in tables:
