@@ -99,7 +99,8 @@ class QueryObserver(object):
         with self._pool.query_interceptor.intercept(tables):
             try:
                 queryset = self._viewset.filter_queryset(self._viewset.get_queryset())
-                results = self._serializer(queryset, many=True).data
+                page = self._viewset.paginate_queryset(queryset)
+                results = self._serializer(page if page is not None else queryset, many=True).data
             except django_exceptions.ObjectDoesNotExist:
                 # The evaluation may fail when certain dependent objects (like users) are removed
                 # from the database. In this case, the observer is stopped.
