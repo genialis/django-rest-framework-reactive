@@ -42,8 +42,8 @@ class QueryObserver(object):
         # viewset with a fake request, so that the viewset methods work as expected.
         viewset = request.viewset_class()
         viewset.request = api_request.Request(request)
+        viewset.format_kwarg = None
         self._viewset = viewset
-        self._serializer = viewset.get_serializer_class()
 
         self._last_results = collections.OrderedDict()
         self._subscribers = set()
@@ -100,7 +100,7 @@ class QueryObserver(object):
             try:
                 queryset = self._viewset.filter_queryset(self._viewset.get_queryset())
                 page = self._viewset.paginate_queryset(queryset)
-                results = self._serializer(page if page is not None else queryset, many=True).data
+                results = self._viewset.get_serializer(page if page is not None else queryset, many=True).data
             except django_exceptions.ObjectDoesNotExist:
                 # The evaluation may fail when certain dependent objects (like users) are removed
                 # from the database. In this case, the observer is stopped.
