@@ -3,15 +3,6 @@ from django.db import transaction
 from django.db.models import signals as model_signals
 
 from . import client
-from .pool import pool
-from resolwe.flow import models as flow_models, serializers as flow_serializers, views as flow_views
-
-# Register all viewsets with the query observer pool.
-# TODO: This should be moved to a separate application.
-pool.register_viewset(flow_views.CollectionViewSet)
-pool.register_viewset(flow_views.DataViewSet)
-pool.register_viewset(flow_views.ProcessViewSet)
-pool.register_viewset(flow_views.DescriptorSchemaViewSet)
 
 # Setup model notifications.
 observer_client = client.QueryObserverClient()
