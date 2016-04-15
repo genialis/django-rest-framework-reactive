@@ -128,7 +128,8 @@ class QueryObserverPool(object):
         self._viewsets.add(viewset)
 
         # Patch viewset with our observable viewset mixin.
-        viewset.__bases__ = (viewsets.ObservableViewSetMixin,) + viewset.__bases__
+        if not issubclass(viewset, viewsets.ObservableViewSetMixin):
+            viewset.__bases__ = (viewsets.ObservableViewSetMixin,) + viewset.__bases__
 
     @serializable
     def register_dependency(self, observer, table):
