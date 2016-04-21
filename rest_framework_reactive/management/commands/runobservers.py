@@ -15,8 +15,8 @@ from django import db
 from django.core import exceptions
 from django.core.management import base
 
-from genesis.queryobserver import rpc, connection
-from genesis.queryobserver.pool import pool
+from ... import rpc, connection
+from ...pool import pool
 
 
 class Command(base.BaseCommand):
@@ -29,7 +29,7 @@ class Command(base.BaseCommand):
     def handle(self, *args, **options):
         # Check if we are using the correct database engine configuration.
         if db.connection.settings_dict['ENGINE'] != 'django_db_geventpool.backends.postgresql_psycopg2':
-            raise exceptions.ImproperlyConfigured("Query observers require the geventpool database engine.")
+            raise exceptions.ImproperlyConfigured("Django REST Framework Reactive requires the geventpool database engine.")
 
         # Make the pool gevent-ready.
         pool.spawner = gevent.spawn

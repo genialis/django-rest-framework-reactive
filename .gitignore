@@ -1,0 +1,33 @@
+ Ignore temporary editor files.
+.*.sw[po]
+*~
+.DS_Store
+
+# Ignore project files
+*.pyproj
+*.sublime-project
+*.sublime-workspace
+sftp-config.json
+.idea
+
+# Ignore binaries.
+*.py[cod]
+*.so
+*.dll
+
+# Ignore built documentation
+_build
+
+# Tox files
+.tox/
+
+# Results of django-jenkins
+reports/
+
+# Ignore files created by setup.py.
+build/
+dist/
+MANIFEST
+*.egg-info
+*.egg
+distribute*.tar.gz

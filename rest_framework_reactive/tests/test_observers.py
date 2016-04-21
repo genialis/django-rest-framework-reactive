@@ -16,7 +16,7 @@ from ..pool import pool
 # Override settings used during tests so we can include some test-only models.
 TEST_SETTINGS = {
     'DEBUG': True,
-    'INSTALLED_APPS': settings.INSTALLED_APPS + ('genesis.queryobserver.tests.apps.QueryObserverTestsConfig',),
+    'INSTALLED_APPS': settings.INSTALLED_APPS + ('rest_framework_reactive.tests.apps.QueryObserverTestsConfig',),
 }
 
 # Create test request factory.

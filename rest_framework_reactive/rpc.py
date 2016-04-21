@@ -9,9 +9,8 @@ from django import db
 from django.core import exceptions
 from django.core.management import base
 
-from genesis.utils.formatters import BraceMessage as __
-from genesis.queryobserver import connection
-from genesis.queryobserver.pool import pool
+from . import connection
+from .pool import pool
 
 # Logger.
 logger = logging.getLogger(__name__)
@@ -41,7 +40,7 @@ class RedisObserverEventHandler(object):
             try:
                 event = pickle.loads(event['data'])
             except ValueError:
-                logger.error(__("Ignoring received malformed event '{}'.", event['data'][:20]))
+                logger.error("Ignoring received malformed event '{}'.", event['data'][:20])
                 continue
 
             # Handle event.
@@ -49,16 +48,16 @@ class RedisObserverEventHandler(object):
                 event_name = event.pop('event')
                 handler = getattr(self, 'event_%s' % event_name)
             except AttributeError:
-                logger.error(__("Ignoring unimplemented event '{}'.", event_name))
+                logger.error("Ignoring unimplemented event '{}'.", event_name)
                 continue
             except KeyError:
-                logger.error(__("Ignoring received malformed event '{}'.", event))
+                logger.error("Ignoring received malformed event '{}'.", event)
                 continue
 
             try:
                 handler(**event)
             except:
-                logger.error(__("Unhandled exception while executing event '{}'.", event_name))
+                logger.error("Unhandled exception while executing event '{}'.", event_name)
                 logger.error(traceback.format_exc())
             finally:
                 db.close_old_connections()
@@ -113,7 +112,7 @@ class WSGIObserverCommandHandler(object):
             start_response('400 Bad Request', [('Content-Type', 'text/json')])
             return [json.dumps({'error': "Bad request."})]
         except:
-            logger.error(__("Unhandled exception while executing command '{}'.", command))
+            logger.error("Unhandled exception while executing command '{}'.", command)
             logger.error(traceback.format_exc())
 
             start_response('500 Internal Server Error', [('Content-Type', 'text/json')])

@@ -2,7 +2,7 @@ import requests
 import redis
 import cPickle as pickle
 
-from genesis.queryobserver import connection
+from . import connection
 
 
 class QueryObserverClient(object):

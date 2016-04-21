@@ -2,7 +2,7 @@ from django.conf import settings
 
 
 # Redis channel for receiving control messages.
-QUERYOBSERVER_REDIS_CHANNEL = 'genesis:queryobserver:control'
+QUERYOBSERVER_REDIS_CHANNEL = 'django-rest-framework-reactive:control'
 
 
 def get_redis_settings():
@@ -28,5 +28,5 @@ def get_queryobserver_settings():
         'host': 'localhost',
         'port': 9432,
     }
-    defaults.update(getattr(settings, 'QUERYOBSERVER', {}))
+    defaults.update(getattr(settings, 'DJANGO_REST_FRAMEWORK_REACTIVE', {}))
     return defaults
