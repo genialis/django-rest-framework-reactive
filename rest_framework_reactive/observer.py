@@ -175,7 +175,8 @@ class QueryObserver(object):
             (QueryObserver.MESSAGE_CHANGED, changed),
             (QueryObserver.MESSAGE_REMOVED, removed),
         ):
-            for subscriber in self._subscribers:
+            # Make a copy of the subscribers set as the publish operation may yield and modify the set.
+            for subscriber in self._subscribers.copy():
                 session_publisher = publisher.RedisPublisher(facility=subscriber, broadcast=True)
                 for row in rows:
                     session_publisher.publish_message(redis_store.RedisMessage(json.dumps({

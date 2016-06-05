@@ -270,6 +270,8 @@ class QueryObserverPool(object):
             for observer in queue:
                 try:
                     observer.evaluate(return_full=False)
+                except exceptions.ObserverStopped:
+                    pass
                 except:
                     traceback.print_exc()
         finally:
