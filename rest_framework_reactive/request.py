@@ -9,7 +9,7 @@ class Request(http_request.HttpRequest):
     request class is picklable.
     """
 
-    def __init__(self, viewset_class, viewset_method, request):
+    def __init__(self, viewset_class, viewset_method, request, args=None, kwargs=None):
         """
         :param request: The original API request
         """
@@ -18,6 +18,8 @@ class Request(http_request.HttpRequest):
 
         self.viewset_class = viewset_class
         self.viewset_method = viewset_method
+        self.args = args or []
+        self.kwargs = kwargs or {}
 
         # Copy relevant fields from the original request.
         self.GET = request._request.GET.copy()
@@ -41,6 +43,8 @@ class Request(http_request.HttpRequest):
             hasher.update(self.viewset_class.__module__)
             hasher.update(self.viewset_class.__name__)
             hasher.update(self.viewset_method)
+            # Arguments do not need to be taken into account as they are
+            # derived from the request path, which is already accounted for.
             for key in sorted(self.GET.keys()):
                 hasher.update(key)
                 hasher.update(self.GET[key])
@@ -58,6 +62,8 @@ class Request(http_request.HttpRequest):
         return {
             'viewset_class': self.viewset_class,
             'viewset_method': self.viewset_method,
+            'args': self.args,
+            'kwargs': self.kwargs,
             'GET': self.GET,
             'path': self.path,
             'path_info': self.path_info,
@@ -68,6 +74,8 @@ class Request(http_request.HttpRequest):
     def __setstate__(self, state):
         self.viewset_class = state['viewset_class']
         self.viewset_method = state['viewset_method']
+        self.args = state['args']
+        self.kwargs = state['kwargs']
         self.GET = state['GET']
         self.path = state['path']
         self.path_info = state['path_info']

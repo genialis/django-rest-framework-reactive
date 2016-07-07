@@ -96,7 +96,13 @@ class QueryObserver(object):
         stop_observer = False
         with self._pool.query_interceptor.intercept(tables):
             try:
-                results = getattr(self._viewset, self._request.viewset_method)(self._viewset.request).data
+                results = getattr(self._viewset, self._request.viewset_method)(
+                    self._viewset.request,
+                    *self._request.args,
+                    **self._request.kwargs
+                ).data
+                if not isinstance(results, list):
+                    results = [results]
             except django_exceptions.ObjectDoesNotExist:
                 # The evaluation may fail when certain dependent objects (like users) are removed
                 # from the database. In this case, the observer is stopped.
