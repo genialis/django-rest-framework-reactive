@@ -41,6 +41,8 @@ class QueryObserver(object):
         viewset = request.viewset_class()
         viewset.request = api_request.Request(request)
         viewset.format_kwarg = None
+        viewset.args = request.args
+        viewset.kwargs = request.kwargs
         self._viewset = viewset
         self._request = request
 
