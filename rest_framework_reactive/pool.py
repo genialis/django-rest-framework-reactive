@@ -5,7 +5,7 @@ import types
 from django import db
 from django.db.models.sql import compiler
 
-from . import observer, exceptions, viewsets
+from . import observer, exceptions, viewsets, decorators
 
 
 def serializable(function):
@@ -127,9 +127,10 @@ class QueryObserverPool(object):
             raise exceptions.ViewSetAlreadyRegistered
         self._viewsets.add(viewset)
 
-        # Patch viewset with our observable viewset mixin.
-        if not issubclass(viewset, viewsets.ObservableViewSetMixin):
-            viewset.__bases__ = (viewsets.ObservableViewSetMixin,) + viewset.__bases__
+        # Patch list method if one exists.
+        list_method = getattr(viewset, 'list', None)
+        if list_method is not None and not getattr(list_method, 'is_observable', False):
+            viewset.list = decorators.observable(list_method)
 
     @serializable
     def register_dependency(self, observer, table):

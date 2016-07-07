@@ -28,4 +28,6 @@ def observable(method):
             # Non-reactive API.
             return method(self, request, *args, **kwargs)
 
+    wrapper.is_observable = True
+
     return wrapper
