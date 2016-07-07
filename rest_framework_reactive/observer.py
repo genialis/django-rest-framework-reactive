@@ -2,6 +2,7 @@ import collections
 import json
 
 from django.core import exceptions as django_exceptions
+from django.http import Http404
 
 from rest_framework import request as api_request
 from ws4redis import publisher, redis_store
@@ -96,13 +97,20 @@ class QueryObserver(object):
         stop_observer = False
         with self._pool.query_interceptor.intercept(tables):
             try:
-                results = getattr(self._viewset, self._request.viewset_method)(
+                response = getattr(self._viewset, self._request.viewset_method)(
                     self._viewset.request,
                     *self._request.args,
                     **self._request.kwargs
-                ).data
-                if not isinstance(results, list):
-                    results = [results]
+                )
+
+                if response.status_code == 200:
+                    results = response.data
+                    if not isinstance(results, list):
+                        results = [results]
+                else:
+                    results = []
+            except Http404:
+                results = []
             except django_exceptions.ObjectDoesNotExist:
                 # The evaluation may fail when certain dependent objects (like users) are removed
                 # from the database. In this case, the observer is stopped.
