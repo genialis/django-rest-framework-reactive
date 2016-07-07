@@ -3,13 +3,12 @@ from django.apps import apps
 from django.conf import settings
 from django.core import management
 from django.test import utils
-from django.db.models import query as django_query
 from django.contrib.auth import models as auth_models
 
 from guardian import shortcuts
 from rest_framework import test as api_test, request as api_request
 
-from . import models, serializers, views
+from . import models, views
 from .. import request as observer_request
 from ..pool import pool
 
@@ -45,14 +44,18 @@ class QueryObserversTestCase(test.TestCase):
         pool.stop_all()
 
     def request(self, viewset_class, **kwargs):
-        return observer_request.Request(viewset_class, api_request.Request(factory.get('/', kwargs)))
+        return observer_request.Request(
+            viewset_class,
+            'list',
+            api_request.Request(factory.get('/', kwargs))
+        )
 
     def test_observe_viewset(self):
         # Create a request and an observer for it.
         observer = pool.observe_viewset(self.request(views.ExampleItemViewSet), 'test-subscriber')
         items = observer.evaluate()
 
-        self.assertEquals(observer.id, '8e40282bb959b6b6eefa424f594b5e32bc50aebedf1f6a66dc7f599e75c6a26f')
+        self.assertEquals(observer.id, 'fdd1312a8082540528908c32f4a94cac55365ef7acadc8e5ae8d4795cd7b5fa6')
         self.assertEquals(items, [])
 
         # Add an item into the database.
@@ -61,7 +64,7 @@ class QueryObserversTestCase(test.TestCase):
         item.enabled = True
         item.save()
 
-        shortcuts.assign_perm('queryobserver.view_exampleitem', auth_models.AnonymousUser(), item)
+        shortcuts.assign_perm('rest_framework_reactive.view_exampleitem', auth_models.AnonymousUser(), item)
 
         # Evaluate the observer again (in reality this would be done automatically, triggered by signals
         # from Django ORM).
@@ -98,8 +101,8 @@ class QueryObserversTestCase(test.TestCase):
         item3.enabled = True
         item3.save()
 
-        shortcuts.assign_perm('queryobserver.view_exampleitem', auth_models.AnonymousUser(), item2)
-        shortcuts.assign_perm('queryobserver.view_exampleitem', auth_models.AnonymousUser(), item3)
+        shortcuts.assign_perm('rest_framework_reactive.view_exampleitem', auth_models.AnonymousUser(), item2)
+        shortcuts.assign_perm('rest_framework_reactive.view_exampleitem', auth_models.AnonymousUser(), item3)
 
         added, changed, removed = observer.evaluate(return_emitted=True)
         self.assertEquals(len(added), 2)
@@ -113,7 +116,7 @@ class QueryObserversTestCase(test.TestCase):
         observer = pool.observe_viewset(self.request(views.ExampleItemViewSet, enabled=True), 'test-subscriber')
         items = observer.evaluate()
 
-        self.assertEquals(observer.id, '8903bb97f59dd10cfe6896f632ebcf9ea8240c9f2df39f966b4157b5811c5dad')
+        self.assertEquals(observer.id, '0c2544b340aeb1919180ee6898a8e117de76b4a09dcedff7d6d172f3caa677c2')
         self.assertEquals(len(items), 0)
 
         item = models.ExampleItem()
@@ -121,7 +124,7 @@ class QueryObserversTestCase(test.TestCase):
         item.enabled = False
         item.save()
 
-        shortcuts.assign_perm('queryobserver.view_exampleitem', auth_models.AnonymousUser(), item)
+        shortcuts.assign_perm('rest_framework_reactive.view_exampleitem', auth_models.AnonymousUser(), item)
 
         added, changed, removed = observer.evaluate(return_emitted=True)
 
@@ -150,16 +153,16 @@ class QueryObserversTestCase(test.TestCase):
         subitem = models.ExampleSubItem(parent=item, enabled=True)
         subitem.save()
 
-        shortcuts.assign_perm('queryobserver.view_exampleitem', auth_models.AnonymousUser(), item)
-        shortcuts.assign_perm('queryobserver.view_examplesubitem', auth_models.AnonymousUser(), subitem)
+        shortcuts.assign_perm('rest_framework_reactive.view_exampleitem', auth_models.AnonymousUser(), item)
+        shortcuts.assign_perm('rest_framework_reactive.view_examplesubitem', auth_models.AnonymousUser(), subitem)
 
         observer = pool.observe_viewset(self.request(views.ExampleSubItemViewSet, parent__enabled=True), 'test-subscriber')
         items = observer.evaluate()
 
-        self.assertEquals(observer.id, 'd23637692d98a517ccb7cbd92a6af2a187837f893aff9c2ce1ec0f0f3f2b850b')
+        self.assertEquals(observer.id, '009955bdb64c21f679a7dfa2f747d6025ffef3185e5e01805662ebe8ca89c1d3')
         self.assertEquals(len(items), 0)
-        self.assertIn(observer, pool._tables['queryobserver_exampleitem'])
-        self.assertIn(observer, pool._tables['queryobserver_examplesubitem'])
+        self.assertIn(observer, pool._tables['rest_framework_reactive_exampleitem'])
+        self.assertIn(observer, pool._tables['rest_framework_reactive_examplesubitem'])
 
     def test_order(self):
         observer = pool.observe_viewset(self.request(views.ExampleItemViewSet, ordering='name'), 'test-subscriber')
@@ -172,7 +175,7 @@ class QueryObserversTestCase(test.TestCase):
         item.enabled = False
         item.save()
 
-        shortcuts.assign_perm('queryobserver.view_exampleitem', auth_models.AnonymousUser(), item)
+        shortcuts.assign_perm('rest_framework_reactive.view_exampleitem', auth_models.AnonymousUser(), item)
 
         added, changed, removed = observer.evaluate(return_emitted=True)
 
@@ -187,7 +190,7 @@ class QueryObserversTestCase(test.TestCase):
         item2.enabled = True
         item2.save()
 
-        shortcuts.assign_perm('queryobserver.view_exampleitem', auth_models.AnonymousUser(), item2)
+        shortcuts.assign_perm('rest_framework_reactive.view_exampleitem', auth_models.AnonymousUser(), item2)
 
         added, changed, removed = observer.evaluate(return_emitted=True)
 
@@ -205,7 +208,7 @@ class QueryObserversTestCase(test.TestCase):
         item3.enabled = True
         item3.save()
 
-        shortcuts.assign_perm('queryobserver.view_exampleitem', auth_models.AnonymousUser(), item3)
+        shortcuts.assign_perm('rest_framework_reactive.view_exampleitem', auth_models.AnonymousUser(), item3)
 
         added, changed, removed = observer.evaluate(return_emitted=True)
         self.assertEquals(len(added), 1)

@@ -9,7 +9,7 @@ class Request(http_request.HttpRequest):
     request class is picklable.
     """
 
-    def __init__(self, viewset_class, request):
+    def __init__(self, viewset_class, viewset_method, request):
         """
         :param request: The original API request
         """
@@ -17,6 +17,7 @@ class Request(http_request.HttpRequest):
         super(Request, self).__init__()
 
         self.viewset_class = viewset_class
+        self.viewset_method = viewset_method
 
         # Copy relevant fields from the original request.
         self.GET = request._request.GET.copy()
@@ -39,6 +40,7 @@ class Request(http_request.HttpRequest):
             hasher = hashlib.sha256()
             hasher.update(self.viewset_class.__module__)
             hasher.update(self.viewset_class.__name__)
+            hasher.update(self.viewset_method)
             for key in sorted(self.GET.keys()):
                 hasher.update(key)
                 hasher.update(self.GET[key])
@@ -55,6 +57,7 @@ class Request(http_request.HttpRequest):
     def __getstate__(self):
         return {
             'viewset_class': self.viewset_class,
+            'viewset_method': self.viewset_method,
             'GET': self.GET,
             'path': self.path,
             'path_info': self.path_info,
@@ -64,6 +67,7 @@ class Request(http_request.HttpRequest):
 
     def __setstate__(self, state):
         self.viewset_class = state['viewset_class']
+        self.viewset_method = state['viewset_method']
         self.GET = state['GET']
         self.path = state['path']
         self.path_info = state['path_info']

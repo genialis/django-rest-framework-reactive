@@ -1,15 +1,12 @@
 import collections
 import json
-import hashlib
-import traceback
 
 from django.core import exceptions as django_exceptions
-from django.db.models import query as django_query
 
 from rest_framework import request as api_request
 from ws4redis import publisher, redis_store
 
-from . import exceptions, request as observer_request
+from . import exceptions
 
 
 class QueryObserver(object):
@@ -44,6 +41,7 @@ class QueryObserver(object):
         viewset.request = api_request.Request(request)
         viewset.format_kwarg = None
         self._viewset = viewset
+        self._request = request
 
         self._last_results = collections.OrderedDict()
         self._subscribers = set()
@@ -98,9 +96,7 @@ class QueryObserver(object):
         stop_observer = False
         with self._pool.query_interceptor.intercept(tables):
             try:
-                queryset = self._viewset.filter_queryset(self._viewset.get_queryset())
-                page = self._viewset.paginate_queryset(queryset)
-                results = self._viewset.get_serializer(page if page is not None else queryset, many=True).data
+                results = getattr(self._viewset, self._request.viewset_method)(self._viewset.request).data
             except django_exceptions.ObjectDoesNotExist:
                 # The evaluation may fail when certain dependent objects (like users) are removed
                 # from the database. In this case, the observer is stopped.
@@ -113,7 +109,7 @@ class QueryObserver(object):
         # Register table dependencies.
         for table in tables:
             self.add_dependency(table)
-        self.primary_key = queryset.model._meta.pk.name
+        self.primary_key = self._viewset.get_queryset().model._meta.pk.name
 
         # TODO: Only compute difference between old and new, ideally on the SQL server using hashes.
         new_results = collections.OrderedDict()
