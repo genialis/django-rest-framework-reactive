@@ -5,7 +5,7 @@ import types
 from django import db
 from django.db.models.sql import compiler
 
-from . import observer, exceptions, viewsets, decorators
+from . import observer, exceptions, decorators
 
 
 def serializable(function):
