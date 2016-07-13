@@ -99,7 +99,8 @@ class QueryObserver(object):
         stop_observer = False
         with self._pool.query_interceptor.intercept(tables):
             try:
-                response = getattr(self._viewset, self._request.viewset_method)(
+                observable_view = getattr(self._viewset, self._request.viewset_method)
+                response = observable_view(
                     self._viewset.request,
                     *self._request.args,
                     **self._request.kwargs
@@ -107,8 +108,19 @@ class QueryObserver(object):
 
                 if response.status_code == 200:
                     results = response.data
+                    self.primary_key = getattr(
+                        observable_view,
+                        'primary_key',
+                        self._viewset.get_queryset().model._meta.pk.name
+                    )
+
                     if not isinstance(results, list):
-                        results = [results]
+                        if isinstance(results, dict):
+                            self.primary_key = 'id'
+                            results['id'] = 1
+                            results = [collections.OrderedDict(results)]
+                        else:
+                            raise ValueError("Observable views must return a dictionary or a list of dictionaries!")
                 else:
                     results = []
             except Http404:
@@ -125,7 +137,6 @@ class QueryObserver(object):
         # Register table dependencies.
         for table in tables:
             self.add_dependency(table)
-        self.primary_key = self._viewset.get_queryset().model._meta.pk.name
 
         # TODO: Only compute difference between old and new, ideally on the SQL server using hashes.
         new_results = collections.OrderedDict()
@@ -134,6 +145,9 @@ class QueryObserver(object):
             return []
 
         for order, row in enumerate(results):
+            if not isinstance(row, dict):
+                raise ValueError("Observable views must return a dictionary or a list of dictionaries!")
+
             row._order = order
             new_results[row[self.primary_key]] = row
 
