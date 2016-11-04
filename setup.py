@@ -42,9 +42,7 @@ setup(
     packages=find_packages(exclude=['tests']),
     install_requires=[
         'django>=1.9,<1.10a1',
-        # XXX: djangorestframework 3.3.3 fails to install on Read the Docs
-        # Bug report: https://github.com/rtfd/readthedocs.org/issues/2101
-        'djangorestframework==3.3.2',
+        'djangorestframework>=3.3.2',
         'psycopg2>=2.5.0',
         'gevent>=1.0.2',
         'psycogreen>=1.0',
