@@ -31,4 +31,24 @@ def observable(method):
 
     wrapper.is_observable = True
 
+    # Copy over any special observable attributes.
+    for attribute in dir(method):
+        if attribute.startswith('observable_'):
+            setattr(wrapper, attribute, getattr(method, attribute))
+
     return wrapper
+
+
+def primary_key(name):
+    """
+    A decorator which configures the primary key that should be used for
+    tracking objects in an observable method.
+
+    :param name: Name of the primary key field
+    """
+
+    def decorator(method):
+        method.observable_primary_key = name
+        return method
+
+    return decorator

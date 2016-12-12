@@ -108,11 +108,19 @@ class QueryObserver(object):
 
                 if response.status_code == 200:
                     results = response.data
-                    self.primary_key = getattr(
-                        observable_view,
-                        'primary_key',
-                        self._viewset.get_queryset().model._meta.pk.name
-                    )
+                    try:
+                        self.primary_key = getattr(observable_view, 'observable_primary_key')
+                    except AttributeError:
+                        # Primary key attribute is not defined, attempt to autodiscover it from the queryset.
+                        try:
+                            self.primary_key = self._viewset.get_queryset().model._meta.pk.name
+                        except AssertionError:
+                            # No queryset is defined.
+                            raise exceptions.MissingPrimaryKey(
+                                "Observable method does not define a primary key and the viewset "
+                                "does not provide a queryset. Define a queryset or use the primary_key "
+                                "decorator."
+                            )
 
                     if not isinstance(results, list):
                         if isinstance(results, dict):

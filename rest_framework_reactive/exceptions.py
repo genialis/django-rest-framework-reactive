@@ -12,3 +12,7 @@ class ViewSetNotRegistered(QueryObserverException):
 
 class ObserverStopped(QueryObserverException):
     pass
+
+
+class MissingPrimaryKey(QueryObserverException):
+    pass
