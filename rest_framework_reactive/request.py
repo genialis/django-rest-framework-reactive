@@ -1,5 +1,7 @@
 import hashlib
 
+from six import string_types
+
 from django.http import request as http_request
 
 
@@ -22,6 +24,10 @@ class Request(http_request.HttpRequest):
         self.kwargs = kwargs or {}
 
         # Copy relevant fields from the original request.
+        self.META = {}
+        for key, value in request._request.META.items():
+            if isinstance(value, string_types):
+                self.META[key] = value
         self.GET = request._request.GET.copy()
         if 'observe' in self.GET:
             # Remove the original observe query parameter.
@@ -64,6 +70,7 @@ class Request(http_request.HttpRequest):
             'viewset_method': self.viewset_method,
             'args': self.args,
             'kwargs': self.kwargs,
+            'META': self.META,
             'GET': self.GET,
             'path': self.path,
             'path_info': self.path_info,
@@ -76,6 +83,7 @@ class Request(http_request.HttpRequest):
         self.viewset_method = state['viewset_method']
         self.args = state['args']
         self.kwargs = state['kwargs']
+        self.META = state['META']
         self.GET = state['GET']
         self.path = state['path']
         self.path_info = state['path_info']

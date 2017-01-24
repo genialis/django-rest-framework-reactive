@@ -1,3 +1,5 @@
+import pickle
+
 from django import test
 from django.apps import apps
 from django.conf import settings
@@ -45,11 +47,14 @@ class QueryObserversTestCase(test.TestCase):
         pool.stop_all()
 
     def request(self, viewset_class, **kwargs):
-        return observer_request.Request(
+        request = observer_request.Request(
             viewset_class,
             'list',
             api_request.Request(factory.get('/', kwargs))
         )
+
+        # Simulate serialization.
+        return pickle.loads(pickle.dumps(request))
 
     def test_paginated_viewset(self):
         observer = pool.observe_viewset(self.request(views.PaginatedViewSet, offset=0, limit=10), 'test-subscriber')
@@ -57,19 +62,16 @@ class QueryObserversTestCase(test.TestCase):
 
         self.assertEquals(items, [])
 
-        item = models.ExampleItem()
-        item.name = 'Example'
-        item.enabled = True
-        item.save()
-
-        shortcuts.assign_perm('rest_framework_reactive.view_exampleitem', auth_models.AnonymousUser(), item)
+        items = []
+        for index in xrange(20):
+            items.append(models.ExampleItem.objects.create(name='Example', enabled=True))
 
         # Evaluate the observer again (in reality this would be done automatically, triggered by signals
         # from Django ORM).
         added, changed, removed = observer.evaluate(return_emitted=True)
 
-        self.assertEquals(len(added), 1)
-        expected_serialized_item = {'id': item.pk, 'name': item.name, 'enabled': item.enabled}
+        self.assertEquals(len(added), 10)
+        expected_serialized_item = {'id': items[0].pk, 'name': items[0].name, 'enabled': items[0].enabled}
         self.assertEquals(added[0], expected_serialized_item)
         self.assertEquals(len(changed), 0)
         self.assertEquals(len(removed), 0)
