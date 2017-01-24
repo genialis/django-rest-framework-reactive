@@ -124,9 +124,13 @@ class QueryObserver(object):
 
                     if not isinstance(results, list):
                         if isinstance(results, dict):
-                            self.primary_key = 'id'
-                            results['id'] = 1
-                            results = [collections.OrderedDict(results)]
+                            if 'results' in results and isinstance(results['results'], list):
+                                # Support paginated results.
+                                results = results['results']
+                            else:
+                                self.primary_key = 'id'
+                                results['id'] = 1
+                                results = [collections.OrderedDict(results)]
                         else:
                             raise ValueError("Observable views must return a dictionary or a list of dictionaries!")
                 else:

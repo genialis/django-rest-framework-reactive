@@ -37,6 +37,7 @@ class QueryObserversTestCase(test.TestCase):
         # Register observable viewsets.
         pool.register_viewset(views.ExampleItemViewSet)
         pool.register_viewset(views.ExampleSubItemViewSet)
+        pool.register_viewset(views.PaginatedViewSet)
 
     def tearDown(self):
         super(QueryObserversTestCase, self).tearDown()
@@ -49,6 +50,29 @@ class QueryObserversTestCase(test.TestCase):
             'list',
             api_request.Request(factory.get('/', kwargs))
         )
+
+    def test_paginated_viewset(self):
+        observer = pool.observe_viewset(self.request(views.PaginatedViewSet, offset=0, limit=10), 'test-subscriber')
+        items = observer.evaluate()
+
+        self.assertEquals(items, [])
+
+        item = models.ExampleItem()
+        item.name = 'Example'
+        item.enabled = True
+        item.save()
+
+        shortcuts.assign_perm('rest_framework_reactive.view_exampleitem', auth_models.AnonymousUser(), item)
+
+        # Evaluate the observer again (in reality this would be done automatically, triggered by signals
+        # from Django ORM).
+        added, changed, removed = observer.evaluate(return_emitted=True)
+
+        self.assertEquals(len(added), 1)
+        expected_serialized_item = {'id': item.pk, 'name': item.name, 'enabled': item.enabled}
+        self.assertEquals(added[0], expected_serialized_item)
+        self.assertEquals(len(changed), 0)
+        self.assertEquals(len(removed), 0)
 
     def test_observe_viewset(self):
         # Create a request and an observer for it.
