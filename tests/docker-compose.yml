@@ -1,0 +1,15 @@
+#
+# Development configuration of dependent services for Docker Compose.
+#
+postgresql:
+    image: postgres:9.4
+    environment:
+        POSTGRES_USER: drfr
+        POSTGRES_DB: drfr
+    ports:
+        - "55435:5432"
+redis:
+    image: redis
+    ports:
+        - "56380:6379"
+
