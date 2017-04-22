@@ -27,6 +27,15 @@ def get_queryobserver_settings():
     defaults = {
         'host': 'localhost',
         'port': 9432,
+        # Observers going over these limits will emit warnings.
+        'warnings': {
+            'max_result_length': 1000,
+            'max_processing_time': 1.0,
+        },
+        # Observers going over these limits will be stopped.
+        'errors': {
+            'max_processing_time': 20.0,
+        },
     }
     defaults.update(getattr(settings, 'DJANGO_REST_FRAMEWORK_REACTIVE', {}))
     return defaults

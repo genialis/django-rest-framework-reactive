@@ -1,11 +1,11 @@
 import contextlib
-import traceback
 import types
 
 from django import db
 from django.db.models.sql import compiler
 
-from . import observer, exceptions, decorators
+from . import exceptions, decorators
+from .observer import QueryObserver
 
 
 def serializable(function):
@@ -164,7 +164,7 @@ class QueryObserverPool(object):
         :return: Query observer instance
         """
 
-        query_observer = observer.QueryObserver(self, request)
+        query_observer = QueryObserver(self, request)
         if query_observer.id in self._observers:
             existing = self._observers[query_observer.id]
             if not existing.stopped:
@@ -273,8 +273,6 @@ class QueryObserverPool(object):
                     observer.evaluate(return_full=False)
                 except exceptions.ObserverStopped:
                     pass
-                except:
-                    traceback.print_exc()
         finally:
             db.close_old_connections()
 

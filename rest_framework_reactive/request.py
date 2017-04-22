@@ -89,3 +89,11 @@ class Request(http_request.HttpRequest):
         self.path_info = state['path_info']
         self._force_auth_user = state['user']
         self._observe_id = state['observe_id']
+
+    def __repr__(self):
+        return '<Request viewset={viewset} method="{method}" path="{path}" query={get}>'.format(
+            viewset=repr(self.viewset_class),
+            method=self.viewset_method,
+            path=self.path,
+            get=repr(self.GET),
+        )

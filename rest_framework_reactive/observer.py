@@ -1,5 +1,7 @@
 import collections
 import json
+import logging
+import time
 
 from django.core import exceptions as django_exceptions
 from django.http import Http404
@@ -8,6 +10,10 @@ from rest_framework import request as api_request
 from ws4redis import publisher, redis_store
 
 from . import exceptions
+from .connection import get_queryobserver_settings
+
+# Logger.
+logger = logging.getLogger(__name__)  # pylint: disable=invalid-name
 
 
 class QueryObserver(object):
@@ -74,6 +80,40 @@ class QueryObserver(object):
         return self.status == QueryObserver.STATUS_STOPPED
 
     def evaluate(self, return_full=True, return_emitted=False):
+        """
+        Evaluates the query observer and checks if there have been any changes. This function
+        may yield.
+
+        :param return_full: True if the full set of rows should be returned
+        :param return_emitted: True if the emitted diffs should be returned
+        """
+
+        try:
+            start = time.time()
+            result = self._evaluate(return_full, return_emitted)
+            duration = time.time() - start
+
+            # Log slow observers.
+            settings = get_queryobserver_settings()
+            if duration > settings['warnings']['max_processing_time']:
+                # pylint: disable=logging-format-interpolation
+                logger.warning("Slow observer took {} seconds to evaluate.".format(duration))
+                logger.warning("Potentially slow observer is: {}".format(repr(self)))
+
+            # Stop really slow observers.
+            if duration > settings['errors']['max_processing_time']:
+                # pylint: disable=logging-format-interpolation
+                logger.error("Stopping slow observer that took {} seconds to evaluate.".format(duration))
+                self.stop()
+
+            return result
+        except exceptions.ObserverStopped:
+            raise
+        except:  # pylint: disable=bare-except
+            # pylint: disable=logging-format-interpolation
+            logger.exception("Error while evaluating observer: {}".format(repr(self)))
+
+    def _evaluate(self, return_full=True, return_emitted=False):
         """
         Evaluates the query observer and checks if there have been any changes. This function
         may yield.
@@ -155,6 +195,12 @@ class QueryObserver(object):
 
         if self.status == QueryObserver.STATUS_STOPPED:
             return []
+
+        # Log viewsets with too much output.
+        if len(results) > get_queryobserver_settings()['warnings']['max_result_length']:
+            # pylint: disable=logging-format-interpolation
+            logger.warning("Observed viewset returned {} results.".format(len(results)))
+            logger.warning("Potentially slow observer is: {}".format(repr(self)))
 
         for order, row in enumerate(results):
             if not isinstance(row, dict):
@@ -255,6 +301,7 @@ class QueryObserver(object):
             return
 
         self.status = QueryObserver.STATUS_STOPPED
+        self._last_results.clear()
 
         # Unregister all dependencies.
         for dependency in self._dependencies:
@@ -271,3 +318,9 @@ class QueryObserver(object):
 
     def __hash__(self):
         return hash(self.id)
+
+    def __repr__(self):
+        return '<QueryObserver id="{id}" request={request}>'.format(
+            id=self.id,
+            request=repr(self._request)
+        )

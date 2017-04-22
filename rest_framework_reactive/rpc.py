@@ -6,8 +6,6 @@ import traceback
 import json
 
 from django import db
-from django.core import exceptions
-from django.core.management import base
 
 from . import connection
 from .pool import pool
