@@ -32,6 +32,13 @@ class QueryObserverClient(object):
             data=pickle.dumps(kwargs),
         ).json()
 
+    def status(self):
+        """
+        Return server status.
+        """
+
+        return self._request('status')
+
     def create_observer(self, request, subscriber):
         """
         Starts observing a specific viewset.

@@ -115,6 +115,20 @@ class QueryObserverPool(object):
         self._pending_process = False
         self.query_interceptor = QueryInterceptor(self)
 
+    @property
+    def statistics(self):
+        """
+        Return pool statistics.
+        """
+
+        return {
+            'viewsets': len(self._viewsets),
+            'observers': len(self._observers),
+            'tables': len(self._tables),
+            'subscribers': len(self._subscribers),
+            'queue': len(self._queue),
+        }
+
     @serializable
     def register_viewset(self, viewset):
         """

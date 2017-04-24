@@ -7,6 +7,7 @@ import json
 
 from django import db
 
+from .__about__ import __version__
 from . import connection
 from .pool import pool
 
@@ -117,6 +118,16 @@ class WSGIObserverCommandHandler(object):
             return [json.dumps({'error': "Internal server error."})]
         finally:
             db.close_old_connections()
+
+    def command_status(self):
+        """
+        Return some status information about the observer pool.
+        """
+
+        return {
+            'version': __version__,
+            'statistics': pool.statistics,
+        }
 
     def command_create_observer(self, request, subscriber):
         """
