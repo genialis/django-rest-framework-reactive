@@ -18,6 +18,7 @@ Added
 Fixed
 -----
 * ``META`` passthrough in requests
+* Correct passthrough of ``request.method``
 
 
 =================

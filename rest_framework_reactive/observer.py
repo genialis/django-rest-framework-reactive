@@ -46,6 +46,7 @@ class QueryObserver(object):
         # viewset with a fake request, so that the viewset methods work as expected.
         viewset = request.viewset_class()
         viewset.request = api_request.Request(request)
+        viewset.request.method = request.method
         viewset.format_kwarg = None
         viewset.args = request.args
         viewset.kwargs = request.kwargs
@@ -112,6 +113,7 @@ class QueryObserver(object):
         except:  # pylint: disable=bare-except
             # pylint: disable=logging-format-interpolation
             logger.exception("Error while evaluating observer: {}".format(repr(self)))
+            return []
 
     def _evaluate(self, return_full=True, return_emitted=False):
         """
@@ -207,7 +209,10 @@ class QueryObserver(object):
                 raise ValueError("Observable views must return a dictionary or a list of dictionaries!")
 
             row._order = order
-            new_results[row[self.primary_key]] = row
+            try:
+                new_results[row[self.primary_key]] = row
+            except KeyError:
+                raise KeyError("Observable view did not return primary key field '{}'!".format(self.primary_key))
 
         # Process difference between old results and new results.
         added = []

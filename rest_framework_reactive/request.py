@@ -24,6 +24,7 @@ class Request(http_request.HttpRequest):
         self.kwargs = kwargs or {}
 
         # Copy relevant fields from the original request.
+        self.method = request.method
         self.META = {}
         for key, value in request._request.META.items():
             if isinstance(value, string_types):
@@ -70,6 +71,7 @@ class Request(http_request.HttpRequest):
             'viewset_method': self.viewset_method,
             'args': self.args,
             'kwargs': self.kwargs,
+            'method': self.method,
             'META': self.META,
             'GET': self.GET,
             'path': self.path,
@@ -83,6 +85,7 @@ class Request(http_request.HttpRequest):
         self.viewset_method = state['viewset_method']
         self.args = state['args']
         self.kwargs = state['kwargs']
+        self.method = state['method']
         self.META = state['META']
         self.GET = state['GET']
         self.path = state['path']
