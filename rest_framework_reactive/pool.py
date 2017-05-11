@@ -113,6 +113,7 @@ class QueryObserverPool(object):
         self._subscribers = {}
         self._queue = set()
         self._pending_process = False
+        self._evaluations = 0
         self.query_interceptor = QueryInterceptor(self)
 
     @property
@@ -127,6 +128,7 @@ class QueryObserverPool(object):
             'tables': len(self._tables),
             'subscribers': len(self._subscribers),
             'queue': len(self._queue),
+            'evaluations': self._evaluations,
         }
 
     @serializable
@@ -190,6 +192,7 @@ class QueryObserverPool(object):
 
         query_observer.subscribe(subscriber)
         self._subscribers.setdefault(subscriber, set()).add(query_observer)
+        self._evaluations += 1
         return query_observer
 
     @serializable
@@ -284,6 +287,7 @@ class QueryObserverPool(object):
         try:
             for observer in queue:
                 try:
+                    self._evaluations += 1
                     observer.evaluate(return_full=False)
                 except exceptions.ObserverStopped:
                     pass
