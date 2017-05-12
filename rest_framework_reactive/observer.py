@@ -3,6 +3,7 @@ import json
 import logging
 import time
 
+from django import db
 from django.core import exceptions as django_exceptions
 from django.http import Http404
 
@@ -53,6 +54,8 @@ class QueryObserver(object):
         self._viewset = viewset
         self._request = request
 
+        self._evaluating = False
+        self._last_evaluation = None
         self._last_results = collections.OrderedDict()
         self._subscribers = set()
         self._dependencies = set()
@@ -89,13 +92,33 @@ class QueryObserver(object):
         :param return_emitted: True if the emitted diffs should be returned
         """
 
+        if self._evaluating:
+            # Ignore evaluate requests if the observer is already being evaluated.
+            return
+
+        self._evaluating = True
+
         try:
+            # Increment evaluation statistics counter.
+            self._pool._evaluations += 1
+            settings = get_queryobserver_settings()
+
+            # After an update is processed, all incoming requests are batched until
+            # the update batch delay passes.
+            if self._last_evaluation is not None:
+                delta = time.time() - self._last_evaluation
+                remaining = settings['update_batch_delay'] - delta
+
+                if remaining > 0:
+                    # We assume that time.sleep has been patched and will correctly yield.
+                    time.sleep(remaining)
+
             start = time.time()
             result = self._evaluate(return_full, return_emitted)
             duration = time.time() - start
+            self._last_evaluation = time.time()
 
             # Log slow observers.
-            settings = get_queryobserver_settings()
             if duration > settings['warnings']['max_processing_time']:
                 # pylint: disable=logging-format-interpolation
                 logger.warning("Slow observer took {} seconds to evaluate.".format(duration))
@@ -114,6 +137,11 @@ class QueryObserver(object):
             # pylint: disable=logging-format-interpolation
             logger.exception("Error while evaluating observer: {}".format(repr(self)))
             return []
+        finally:
+            self._evaluating = False
+
+            # Cleanup any leftover connections.
+            db.close_old_connections()
 
     def _evaluate(self, return_full=True, return_emitted=False):
         """

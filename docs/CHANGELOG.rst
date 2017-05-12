@@ -14,11 +14,13 @@ Added
 * Logging of slow observers and automatic stopping of very slow
   observers (both are configurable)
 * Status endpoint to track server status
+* Configurable update batch delay
 
 Fixed
 -----
 * ``META`` passthrough in requests
 * Correct passthrough of ``request.method``
+* Improved observer concurrency
 
 
 =================

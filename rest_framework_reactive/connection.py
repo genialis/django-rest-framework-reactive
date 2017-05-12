@@ -36,6 +36,10 @@ def get_queryobserver_settings():
         'errors': {
             'max_processing_time': 20.0,
         },
+        # Update batch delay (in seconds). If a new update comes earlier than the
+        # delay value, queue processing will be delayed so multiple updates can be
+        # batched. A higher value introduces more latency.
+        'update_batch_delay': 5,
     }
     defaults.update(getattr(settings, 'DJANGO_REST_FRAMEWORK_REACTIVE', {}))
     return defaults

@@ -1,7 +1,6 @@
 import contextlib
 import types
 
-from django import db
 from django.db.models.sql import compiler
 
 from . import exceptions, decorators
@@ -92,7 +91,7 @@ class QueryObserverPool(object):
     """
 
     # Callable for deferring execution (for example gevent.spawn).
-    spawner = lambda self, function: function()
+    spawner = lambda self, function, *args, **kwargs: function(*args, **kwargs)
     # Mutex for serializing access to the query observer pool. By default, a
     # dummy implementation that does no locking is used as multi-threaded
     # operation is only used during tests.
@@ -192,7 +191,6 @@ class QueryObserverPool(object):
 
         query_observer.subscribe(subscriber)
         self._subscribers.setdefault(subscriber, set()).add(query_observer)
-        self._evaluations += 1
         return query_observer
 
     @serializable
@@ -272,6 +270,7 @@ class QueryObserverPool(object):
 
         if self._pending_process:
             return
+
         self._pending_process = True
         self.spawner(self._process_notifications)
 
@@ -284,15 +283,15 @@ class QueryObserverPool(object):
         queue = self._queue
         self._queue = set()
 
-        try:
-            for observer in queue:
-                try:
-                    self._evaluations += 1
-                    observer.evaluate(return_full=False)
-                except exceptions.ObserverStopped:
-                    pass
-        finally:
-            db.close_old_connections()
+        def evaluate_observer(observer):
+            try:
+                observer.evaluate(return_full=False)
+            except exceptions.ObserverStopped:
+                pass
+
+        for observer in queue:
+            # Spawn evaluator for each observer.
+            self.spawner(evaluate_observer, observer)
 
 # Global pool instance.
 pool = QueryObserverPool()
