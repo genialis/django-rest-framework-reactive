@@ -113,6 +113,9 @@ class QueryObserverPool(object):
         self._queue = set()
         self._pending_process = False
         self._evaluations = 0
+        self._db_updates = 0
+        self._creations = 0
+        self._destructions = 0
         self.query_interceptor = QueryInterceptor(self)
 
     @property
@@ -128,6 +131,9 @@ class QueryObserverPool(object):
             'subscribers': len(self._subscribers),
             'queue': len(self._queue),
             'evaluations': self._evaluations,
+            'db_updates': self._db_updates,
+            'creations': self._creations,
+            'destructions': self._destructions,
         }
 
     @serializable
@@ -186,8 +192,10 @@ class QueryObserverPool(object):
                 query_observer = existing
             else:
                 self._observers[query_observer.id] = query_observer
+                self._creations += 1
         else:
             self._observers[query_observer.id] = query_observer
+            self._creations += 1
 
         query_observer.subscribe(subscriber)
         self._subscribers.setdefault(subscriber, set()).add(query_observer)
@@ -218,6 +226,7 @@ class QueryObserverPool(object):
             del self._subscribers[subscriber]
 
     def _remove_observer(self, observer):
+        self._destructions += 1
         del self._observers[observer.id]
 
     @serializable
@@ -259,6 +268,7 @@ class QueryObserverPool(object):
             return
 
         # Add all observers that depend on this table to the notification queue.
+        self._db_updates += 1
         self._queue.update(self._tables[table])
         self.process_notifications()
 
