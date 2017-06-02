@@ -23,14 +23,14 @@ Django mainline, we will probably migrate to using those.
 From PyPI
 ---------
 
-.. code::
+.. code:: bash
 
     pip install djangorestframework-reactive
 
 From source
 -----------
 
-.. code::
+.. code:: bash
 
    pip install https://github.com/genialis/django-rest-framework-reactive/archive/<git-tree-ish>.tar.gz
 
@@ -38,7 +38,7 @@ where ``<git-tree-ish>`` can represent any commit SHA, branch name, tag name,
 etc. in `DRF Reactive's GitHub repository`_. For example, to install the latest
 version from the ``master`` branch, use:
 
-.. code::
+.. code:: bash
 
    pip install https://github.com/genialis/django-rest-framework-reactive/archive/master.tar.gz
 
@@ -53,19 +53,19 @@ There are several things that need to be configured in the Django settings file:
 * ``rest_framework_reactive`` needs to be added to ``INSTALLED_APPS``.
 * ``DEFAULT_PAGINATION_CLASS`` needs to be set to ``rest_framework_reactive.pagination.LimitOffsetPagination`` (optionally, this pagination class can instead be set for all viewsets configured for reactivity).
 * ``WS4REDIS_SUBSCRIBER`` needs to be set to ``rest_framework_reactive.websockets.QueryObserverSubscriber``.
-* ``DJANGO_REST_FRAMEWORK_REACTIVE`` needs to be configured with hostname and port where the internal RPC will live. It should be set to something like::
+* ``DJANGO_REST_FRAMEWORK_REACTIVE`` needs to be configured with hostname and port where the internal RPC will live. It should be set to something like:
+.. code:: python
 
-     DJANGO_REST_FRAMEWORK_REACTIVE = {
-        'host': 'localhost',
-        'port': 9432,
-     }
-
-  The hostname and port must be such that they are reachable from the Django application server.
+         DJANGO_REST_FRAMEWORK_REACTIVE = {
+            'host': 'localhost',
+            'port': 9432,
+         }
+The hostname and port must be such that they are reachable from the Django application server.
 
 
 Each ``ViewSet`` that should support reactivity, must be registered by using:
 
-.. code::
+.. code:: python
 
    from rest_framework_reactive.pool import pool
    pool.register_viewset(MyViewSet)
@@ -79,7 +79,7 @@ application server still runs as normal, only the observer process runs using co
 
 The modified ``manage.py`` should look as follows:
 
-.. code::
+.. code:: python
 
    #!/usr/bin/env python
    import os
@@ -106,7 +106,7 @@ The modified ``manage.py`` should look as follows:
 
 And finally, ``urls.py`` need to be updated to include some additional paths:
 
-.. code::
+.. code:: python
 
    urlpatterns = [
      # ...
@@ -120,7 +120,7 @@ Run
 In addition to running a Django application server instance, you need to also run a
 separate observer process. You may start it by running:
 
-.. code::
+.. code:: bash
 
    python manage.py runobservers
 
