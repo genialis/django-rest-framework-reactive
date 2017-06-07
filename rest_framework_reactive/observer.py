@@ -16,6 +16,44 @@ from .connection import get_queryobserver_settings
 # Logger.
 logger = logging.getLogger(__name__)  # pylint: disable=invalid-name
 
+# Observable method options attribute name prefix.
+OBSERVABLE_OPTIONS_PREFIX = 'observable_'
+
+
+class Options(object):
+    """
+    Query observer options.
+    """
+
+    # Valid change detection types.
+    CHANGE_DETECTION_PUSH = 'push'
+    CHANGE_DETECTION_POLL = 'poll'
+
+    def __init__(self, viewset, viewset_method):
+        self._viewset = viewset
+        self._viewset_method = viewset_method
+
+        # Determine the primary key.
+        self.primary_key = self.get_option('primary_key')
+        if self.primary_key is None:
+            # Primary key attribute is not defined, attempt to autodiscover it from the queryset.
+            try:
+                self.primary_key = viewset.get_queryset().model._meta.pk.name
+            except AssertionError:
+                # No queryset is defined.
+                raise exceptions.MissingPrimaryKey(
+                    "Observable method does not define a primary key and the viewset "
+                    "does not provide a queryset. Define a queryset or use the primary_key "
+                    "decorator."
+                )
+
+        # Determine change detection type.
+        self.change_detection = self.get_option('change_detection', Options.CHANGE_DETECTION_PUSH)
+        self.poll_interval = self.get_option('poll_interval')
+
+    def get_option(self, name, default=None):
+        return getattr(self._viewset_method, '{}{}'.format(OBSERVABLE_OPTIONS_PREFIX, name), default)
+
 
 class QueryObserver(object):
     """
@@ -23,11 +61,13 @@ class QueryObserver(object):
     changes to all interested subscribers.
     """
 
+    # Valid observer statuses.
     STATUS_NEW = 'new'
     STATUS_INITIALIZING = 'initializing'
     STATUS_OBSERVING = 'observing'
     STATUS_STOPPED = 'stopped'
 
+    # Valid message types.
     MESSAGE_ADDED = 'added'
     MESSAGE_CHANGED = 'changed'
     MESSAGE_REMOVED = 'removed'
@@ -53,6 +93,8 @@ class QueryObserver(object):
         viewset.kwargs = request.kwargs
         self._viewset = viewset
         self._request = request
+        self._viewset_method = getattr(viewset, request.viewset_method)
+        self._meta = Options(viewset, self._viewset_method)
 
         self._evaluating = False
         self._last_evaluation = None
@@ -82,6 +124,15 @@ class QueryObserver(object):
         """
 
         return self.status == QueryObserver.STATUS_STOPPED
+
+    @property
+    def last_evaluation(self):
+        """
+        Timestamp of last evaluation. May be None if the observer was
+        never evaluated.
+        """
+
+        return self._last_evaluation
 
     def evaluate(self, return_full=True, return_emitted=False):
         """
@@ -132,8 +183,11 @@ class QueryObserver(object):
 
             return result
         except exceptions.ObserverStopped:
-            raise
+            return []
         except:  # pylint: disable=bare-except
+            # Stop crashing observers.
+            self.stop()
+
             # pylint: disable=logging-format-interpolation
             logger.exception("Error while evaluating observer: {}".format(repr(self)))
             return []
@@ -160,8 +214,7 @@ class QueryObserver(object):
         if self.status == QueryObserver.STATUS_INITIALIZING:
             self._initialization_future.wait()
         elif self.status == QueryObserver.STATUS_NEW:
-            if self._pool.future_class is not None:
-                self._initialization_future = self._pool.future_class()
+            self._initialization_future = self._pool.backend.create_future()
             self.status = QueryObserver.STATUS_INITIALIZING
 
         # Evaluate the query (this operation yields).
@@ -169,8 +222,7 @@ class QueryObserver(object):
         stop_observer = False
         with self._pool.query_interceptor.intercept(tables):
             try:
-                observable_view = getattr(self._viewset, self._request.viewset_method)
-                response = observable_view(
+                response = self._viewset_method(
                     self._viewset.request,
                     *self._request.args,
                     **self._request.kwargs
@@ -178,19 +230,6 @@ class QueryObserver(object):
 
                 if response.status_code == 200:
                     results = response.data
-                    try:
-                        self.primary_key = getattr(observable_view, 'observable_primary_key')
-                    except AttributeError:
-                        # Primary key attribute is not defined, attempt to autodiscover it from the queryset.
-                        try:
-                            self.primary_key = self._viewset.get_queryset().model._meta.pk.name
-                        except AssertionError:
-                            # No queryset is defined.
-                            raise exceptions.MissingPrimaryKey(
-                                "Observable method does not define a primary key and the viewset "
-                                "does not provide a queryset. Define a queryset or use the primary_key "
-                                "decorator."
-                            )
 
                     if not isinstance(results, list):
                         if isinstance(results, dict):
@@ -198,8 +237,7 @@ class QueryObserver(object):
                                 # Support paginated results.
                                 results = results['results']
                             else:
-                                self.primary_key = 'id'
-                                results['id'] = 1
+                                results[self._meta.primary_key] = 1
                                 results = [collections.OrderedDict(results)]
                         else:
                             raise ValueError("Observable views must return a dictionary or a list of dictionaries!")
@@ -216,9 +254,17 @@ class QueryObserver(object):
             self.stop()
             return []
 
-        # Register table dependencies.
-        for table in tables:
-            self.add_dependency(table)
+        if self._meta.change_detection == Options.CHANGE_DETECTION_PUSH:
+            # Register table dependencies for push observables.
+            for table in tables:
+                self.add_dependency(table)
+        elif self._meta.change_detection == Options.CHANGE_DETECTION_POLL:
+            # Register poller.
+            self._pool.register_poller(self)
+        else:
+            raise NotImplementedError("Change detection mechanism '{}' not implemented.".format(
+                self._meta.change_detection
+            ))
 
         # TODO: Only compute difference between old and new, ideally on the SQL server using hashes.
         new_results = collections.OrderedDict()
@@ -238,9 +284,9 @@ class QueryObserver(object):
 
             row._order = order
             try:
-                new_results[row[self.primary_key]] = row
+                new_results[row[self._meta.primary_key]] = row
             except KeyError:
-                raise KeyError("Observable view did not return primary key field '{}'!".format(self.primary_key))
+                raise KeyError("Observable view did not return primary key field '{}'!".format(self._meta.primary_key))
 
         # Process difference between old results and new results.
         added = []
@@ -299,7 +345,7 @@ class QueryObserver(object):
                     session_publisher.publish_message(redis_store.RedisMessage(json.dumps({
                         'msg': message_type,
                         'observer': self.id,
-                        'primary_key': self.primary_key,
+                        'primary_key': self._meta.primary_key,
                         'order': getattr(row, '_order', None),
                         'item': row,
                     })))

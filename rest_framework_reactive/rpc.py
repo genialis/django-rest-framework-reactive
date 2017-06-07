@@ -108,6 +108,7 @@ class WSGIObserverCommandHandler(object):
             start_response('200 OK', [('Content-Type', 'text/json')])
             return [json.dumps(response)]
         except TypeError:
+            logger.exception("Observer request failed with bad request error.")
             start_response('400 Bad Request', [('Content-Type', 'text/json')])
             return [json.dumps({'error': "Bad request."})]
         except:

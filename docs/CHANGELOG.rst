@@ -15,12 +15,17 @@ Added
   observers (both are configurable)
 * Status endpoint to track server status
 * Configurable update batch delay
+* Polling observers
 
 Fixed
 -----
 * ``META`` passthrough in requests
 * Correct passthrough of ``request.method``
 * Improved observer concurrency
+
+Changed
+-------
+* More easily support different concurrency backends
 
 
 =================

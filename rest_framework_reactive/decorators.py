@@ -1,6 +1,6 @@
 from rest_framework import response
 
-from . import client, request as observer_request
+from . import client, observer, request as observer_request
 
 observer_client = client.QueryObserverClient()
 
@@ -17,9 +17,9 @@ def observable(method):
     """
 
     def wrapper(self, request, *args, **kwargs):
-        if 'observe' in request.query_params:
+        if observer_request.OBSERVABLE_QUERY_PARAMETER in request.query_params:
             # TODO: Validate the session identifier.
-            session_id = request.query_params['observe']
+            session_id = request.query_params[observer_request.OBSERVABLE_QUERY_PARAMETER]
             data = observer_client.create_observer(
                 observer_request.Request(self.__class__, method.__name__, request, args, kwargs),
                 session_id
@@ -33,7 +33,7 @@ def observable(method):
 
     # Copy over any special observable attributes.
     for attribute in dir(method):
-        if attribute.startswith('observable_'):
+        if attribute.startswith(observer.OBSERVABLE_OPTIONS_PREFIX):
             setattr(wrapper, attribute, getattr(method, attribute))
 
     return wrapper
@@ -41,7 +41,7 @@ def observable(method):
 
 def primary_key(name):
     """
-    A decorator which configures the primary key that should be used for
+    A decorator, which configures the primary key that should be used for
     tracking objects in an observable method.
 
     :param name: Name of the primary key field
@@ -49,6 +49,23 @@ def primary_key(name):
 
     def decorator(method):
         method.observable_primary_key = name
+        return method
+
+    return decorator
+
+
+def polling_observable(interval):
+    """
+    A decorator, which configures the given observable as a polling
+    observable. Instead of tracking changes based on notifications from
+    the ORM, the observer is polled periodically.
+
+    :param interval: Poll interval
+    """
+
+    def decorator(method):
+        method.observable_change_detection = observer.Options.CHANGE_DETECTION_POLL
+        method.observable_poll_interval = interval
         return method
 
     return decorator

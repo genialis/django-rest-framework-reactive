@@ -4,6 +4,9 @@ from six import string_types
 
 from django.http import request as http_request
 
+# Observable query parameter name.
+OBSERVABLE_QUERY_PARAMETER = 'observe'
+
 
 class Request(http_request.HttpRequest):
     """
@@ -30,9 +33,9 @@ class Request(http_request.HttpRequest):
             if isinstance(value, string_types):
                 self.META[key] = value
         self.GET = request._request.GET.copy()
-        if 'observe' in self.GET:
+        if OBSERVABLE_QUERY_PARAMETER in self.GET:
             # Remove the original observe query parameter.
-            del self.GET['observe']
+            del self.GET[OBSERVABLE_QUERY_PARAMETER]
         self.path = request._request.path
         self.path_info = request._request.path_info
         self._force_auth_user = request.user

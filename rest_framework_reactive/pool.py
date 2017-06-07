@@ -5,6 +5,8 @@ from django.db.models.sql import compiler
 
 from . import exceptions, decorators
 from .observer import QueryObserver
+from .backends.base import ObserverBackend
+from .backends.dummy import DummyBackend
 
 
 def serializable(function):
@@ -14,10 +16,11 @@ def serializable(function):
     """
 
     def wrapper(self, *args, **kwargs):
-        if self.lock is None:
+        lock = self.backend.create_lock()
+        if lock is None:
             return function(self, *args, **kwargs)
 
-        with self.lock:
+        with lock:
             return function(self, *args, **kwargs)
 
     return wrapper
@@ -30,7 +33,7 @@ class QueryInterceptor(object):
         self.tables = {}
 
     def _thread_id(self):
-        return id(self.pool.thread_id())
+        return id(self.pool.backend.thread_id)
 
     def _patch(self):
         """
@@ -90,17 +93,6 @@ class QueryObserverPool(object):
     A pool of query observers.
     """
 
-    # Callable for deferring execution (for example gevent.spawn).
-    spawner = lambda self, function, *args, **kwargs: function(*args, **kwargs)
-    # Mutex for serializing access to the query observer pool. By default, a
-    # dummy implementation that does no locking is used as multi-threaded
-    # operation is only used during tests.
-    lock = None
-    # Future class.
-    future_class = None
-    # Current thread id.
-    thread_id = lambda self: None
-
     def __init__(self):
         """
         Creates a new query observer pool.
@@ -113,10 +105,23 @@ class QueryObserverPool(object):
         self._queue = set()
         self._pending_process = False
         self._evaluations = 0
+        self._poll_updates = 0
         self._db_updates = 0
         self._creations = 0
         self._destructions = 0
+
+        self.backend = DummyBackend()
         self.query_interceptor = QueryInterceptor(self)
+
+    def set_backend(self, backend):
+        """
+        Set the backend class that should be used for scheduling observers.
+        """
+
+        if not isinstance(backend, ObserverBackend):
+            raise ValueError("Observer backends must subclass ObserverBackend.")
+
+        self.backend = backend
 
     @property
     def statistics(self):
@@ -132,6 +137,7 @@ class QueryObserverPool(object):
             'queue': len(self._queue),
             'evaluations': self._evaluations,
             'db_updates': self._db_updates,
+            'poll_updates': self._poll_updates,
             'creations': self._creations,
             'destructions': self._destructions,
         }
@@ -163,6 +169,17 @@ class QueryObserverPool(object):
         """
 
         self._tables.setdefault(table, set()).add(observer)
+
+    @serializable
+    def register_poller(self, observer):
+        """
+        Register a new poller for the given observer.
+
+        :param observer: Query observer instance
+        """
+
+        self._poll_updates += 1
+        self.backend.spawn_later(observer._meta.poll_interval, observer.evaluate, return_full=False)
 
     @serializable
     def unregister_dependency(self, observer, table):
@@ -282,7 +299,7 @@ class QueryObserverPool(object):
             return
 
         self._pending_process = True
-        self.spawner(self._process_notifications)
+        self.backend.spawn(self._process_notifications)
 
     def _process_notifications(self):
         """
@@ -293,15 +310,9 @@ class QueryObserverPool(object):
         queue = self._queue
         self._queue = set()
 
-        def evaluate_observer(observer):
-            try:
-                observer.evaluate(return_full=False)
-            except exceptions.ObserverStopped:
-                pass
-
         for observer in queue:
             # Spawn evaluator for each observer.
-            self.spawner(evaluate_observer, observer)
+            self.backend.spawn(observer.evaluate, return_full=False)
 
 # Global pool instance.
 pool = QueryObserverPool()

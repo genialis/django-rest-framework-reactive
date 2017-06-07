@@ -1,7 +1,7 @@
 import gevent
 import gevent.monkey
 import gevent.select
-from gevent import pywsgi, event
+from gevent import pywsgi
 import psycogreen.gevent
 
 import redis.connection
@@ -12,6 +12,7 @@ from django.core.management import base
 from django.utils import autoreload
 
 from ... import rpc, connection
+from ...backends.gevent import GeventBackend
 from ...pool import pool
 
 # Patch the I/O primitives and psycopg2 database driver to be greenlet-enabled.
@@ -49,9 +50,7 @@ class Command(base.BaseCommand):
             raise exceptions.ImproperlyConfigured("Django REST Framework Reactive requires the geventpool database engine.")
 
         # Make the pool gevent-ready.
-        pool.spawner = gevent.spawn
-        pool.future_class = event.Event
-        pool.thread_id = gevent.getcurrent
+        pool.set_backend(GeventBackend())
 
         # Register the event handler for receiving model updates from the Django ORM.
         event_handler = rpc.RedisObserverEventHandler()
