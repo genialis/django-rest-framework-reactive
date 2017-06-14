@@ -1,6 +1,7 @@
 import collections
 import json
 import logging
+import sys
 import time
 
 from django import db
@@ -194,8 +195,11 @@ class QueryObserver(object):
         finally:
             self._evaluating = False
 
-            # Cleanup any leftover connections.
-            db.close_old_connections()
+            # Cleanup any leftover connections. This is something that should not be executed
+            # during tests as it would terminate the database connection.
+            is_testing = sys.argv[1:2] == ['test']
+            if not is_testing:
+                db.close_old_connections()
 
     def _evaluate(self, return_full=True, return_emitted=False):
         """

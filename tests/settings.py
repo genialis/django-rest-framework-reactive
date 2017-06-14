@@ -103,3 +103,11 @@ WS4REDIS_CONNECTION = REDIS_CONNECTION
 WS4REDIS_PREFIX = 'ws'
 
 WS4REDIS_SUBSCRIBER = 'rest_framework_reactive.websockets.QueryObserverSubscriber'
+
+DJANGO_REST_FRAMEWORK_REACTIVE = {
+    'host': 'localhost',
+    'port': 9432,
+    # Set update batch delay to zero during tests as otherwise they can be delayed
+    # and cause test timeouts.
+    'update_batch_delay': 0,
+}

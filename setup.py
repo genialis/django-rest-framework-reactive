@@ -41,8 +41,8 @@ setup(
 
     packages=find_packages(exclude=['tests']),
     install_requires=[
-        'django>=1.9,<1.10a1',
-        'djangorestframework>=3.3.2',
+        'Django~=1.10.5',
+        'djangorestframework>=3.4.0',
         'psycopg2>=2.5.0',
         'gevent>=1.0.2',
         'psycogreen>=1.0',
@@ -62,7 +62,8 @@ setup(
             'wheel',
         ],
         'test': [
-            'django-guardian==1.3.2',
+            'djangorestframework-filters>=0.9.1',
+            'django-guardian>=1.4.2',
             'django-jenkins>=0.17.0',
             'coverage>=3.7.1',
             'pep8>=1.6.2',
