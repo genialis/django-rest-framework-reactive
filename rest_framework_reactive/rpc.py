@@ -127,8 +127,19 @@ class WSGIObserverCommandHandler(object):
 
         return {
             'version': __version__,
+            'backend': '{}.{}'.format(
+                pool.backend.__class__.__module__,
+                pool.backend.__class__.__name__
+            ),
             'statistics': pool.statistics,
         }
+
+    def command_stop_all(self):
+        """
+        Stops all observers.
+        """
+
+        pool.stop_all()
 
     def command_create_observer(self, request, subscriber):
         """

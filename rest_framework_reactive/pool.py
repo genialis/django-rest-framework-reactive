@@ -105,6 +105,8 @@ class QueryObserverPool(object):
         self._queue = set()
         self._pending_process = False
         self._evaluations = 0
+        self._running = 0
+        self._sleeping = 0
         self._poll_updates = 0
         self._db_updates = 0
         self._creations = 0
@@ -129,17 +131,28 @@ class QueryObserverPool(object):
         Return pool statistics.
         """
 
+        observers_by_status = {}
+        for observer in self._observers.values():
+            observers_by_status[observer.status] = observers_by_status.get(observer.status, 0) + 1
+
         return {
             'viewsets': len(self._viewsets),
-            'observers': len(self._observers),
+            'observers': {
+                'total': len(self._observers),
+                'creations': self._creations,
+                'destructions': self._destructions,
+                'evaluations': self._evaluations,
+                'running': self._running,
+                'sleeping': self._sleeping,
+                'status': observers_by_status,
+            },
+            'updates': {
+                'database': self._db_updates,
+                'poll': self._poll_updates,
+                'queue': len(self._queue),
+            },
             'tables': len(self._tables),
             'subscribers': len(self._subscribers),
-            'queue': len(self._queue),
-            'evaluations': self._evaluations,
-            'db_updates': self._db_updates,
-            'poll_updates': self._poll_updates,
-            'creations': self._creations,
-            'destructions': self._destructions,
         }
 
     @serializable

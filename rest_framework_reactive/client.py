@@ -39,6 +39,13 @@ class QueryObserverClient(object):
 
         return self._request('status')
 
+    def stop_all(self):
+        """
+        Stop all observers.
+        """
+
+        return self._request('stop_all')
+
     def create_observer(self, request, subscriber):
         """
         Starts observing a specific viewset.

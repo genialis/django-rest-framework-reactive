@@ -153,6 +153,7 @@ class QueryObserver(object):
         try:
             # Increment evaluation statistics counter.
             self._pool._evaluations += 1
+            self._pool._running += 1
             settings = get_queryobserver_settings()
 
             # After an update is processed, all incoming requests are batched until
@@ -162,8 +163,13 @@ class QueryObserver(object):
                 remaining = settings['update_batch_delay'] - delta
 
                 if remaining > 0:
-                    # We assume that time.sleep has been patched and will correctly yield.
-                    time.sleep(remaining)
+                    try:
+                        self._pool._sleeping += 1
+
+                        # We assume that time.sleep has been patched and will correctly yield.
+                        time.sleep(remaining)
+                    finally:
+                        self._pool._sleeping -= 1
 
             start = time.time()
             result = self._evaluate(return_full, return_emitted)
@@ -194,6 +200,7 @@ class QueryObserver(object):
             return []
         finally:
             self._evaluating = False
+            self._pool._running -= 1
 
             # Cleanup any leftover connections. This is something that should not be executed
             # during tests as it would terminate the database connection.
