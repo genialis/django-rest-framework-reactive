@@ -97,7 +97,7 @@ class QueryObserver(object):
         self._viewset_method = getattr(viewset, request.viewset_method)
         self._meta = Options(viewset, self._viewset_method)
 
-        self._evaluating = False
+        self._evaluating = 0
         self._last_evaluation = None
         self._last_results = collections.OrderedDict()
         self._subscribers = set()
@@ -144,11 +144,20 @@ class QueryObserver(object):
         :param return_emitted: True if the emitted diffs should be returned
         """
 
-        if self._evaluating:
-            # Ignore evaluate requests if the observer is already being evaluated.
+        # Sanity check (should never happen).
+        if self._evaluating < 0:
+            logger.error("Corrupted internal observer state: _evaluating < 0")
+            logger.error("Stopping observer: {}".format(repr(self)))
+            self.stop()
+            return []
+
+        if self._evaluating and not return_full:
+            # Ignore evaluate requests if the observer is already being evaluated. Do
+            # not ignore requests when full results are requested as in that case we
+            # need to wait for the results (the caller needs them).
             return
 
-        self._evaluating = True
+        self._evaluating += 1
 
         try:
             # Increment evaluation statistics counter.
@@ -157,8 +166,9 @@ class QueryObserver(object):
             settings = get_queryobserver_settings()
 
             # After an update is processed, all incoming requests are batched until
-            # the update batch delay passes.
-            if self._last_evaluation is not None:
+            # the update batch delay passes. Batching is not performed when full
+            # results are requested as in that case we want them as fast as possible.
+            if self._last_evaluation is not None and not return_full:
                 delta = time.time() - self._last_evaluation
                 remaining = settings['update_batch_delay'] - delta
 
@@ -199,7 +209,7 @@ class QueryObserver(object):
             logger.exception("Error while evaluating observer: {}".format(repr(self)))
             return []
         finally:
-            self._evaluating = False
+            self._evaluating -= 1
             self._pool._running -= 1
 
             # Cleanup any leftover connections. This is something that should not be executed
