@@ -1,6 +1,8 @@
 """
 The models defined here are only used during testing.
 """
+from __future__ import absolute_import, division, print_function, unicode_literals
+
 from django.db import models
 
 

@@ -1,8 +1,12 @@
+from __future__ import absolute_import, division, print_function, unicode_literals
+
 import collections
 import json
 import logging
 import sys
 import time
+
+import six
 
 from django import db
 from django.core import exceptions as django_exceptions
@@ -313,11 +317,11 @@ class QueryObserver(object):
         added = []
         changed = []
         removed = []
-        for row_id, row in self._last_results.iteritems():
+        for row_id, row in six.iteritems(self._last_results):
             if row_id not in new_results:
                 removed.append(row)
 
-        for row_id, row in new_results.iteritems():
+        for row_id, row in six.iteritems(new_results):
             if row_id not in self._last_results:
                 added.append(row)
             else:

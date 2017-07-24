@@ -1,3 +1,5 @@
+from __future__ import absolute_import, division, print_function, unicode_literals
+
 import pickle
 
 from django import test
@@ -60,10 +62,10 @@ class QueryObserversTestCase(test.TestCase):
         observer = pool.observe_viewset(self.request(views.PaginatedViewSet, offset=0, limit=10), 'test-subscriber')
         items = observer.evaluate()
 
-        self.assertEquals(items, [])
+        self.assertEquals(len(items), 0)
 
         items = []
-        for index in xrange(20):
+        for index in range(20):
             items.append(models.ExampleItem.objects.create(name='Example', enabled=True))
 
         # Evaluate the observer again (in reality this would be done automatically, triggered by signals
@@ -82,7 +84,7 @@ class QueryObserversTestCase(test.TestCase):
         items = observer.evaluate()
 
         self.assertEquals(observer.id, 'fdd1312a8082540528908c32f4a94cac55365ef7acadc8e5ae8d4795cd7b5fa6')
-        self.assertEquals(items, [])
+        self.assertEquals(len(items), 0)
 
         # Add an item into the database.
         item = models.ExampleItem()

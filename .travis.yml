@@ -25,6 +25,10 @@ matrix:
   include:
     - env: TOX_ENV=py27
       python: "2.7"
+    - env: TOX_ENV=py34
+      python: "3.4"
+    - env: TOX_ENV=py35
+      python: "3.5"
 
 install: pip install tox
 

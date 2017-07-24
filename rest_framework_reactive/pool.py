@@ -1,5 +1,9 @@
+from __future__ import absolute_import, division, print_function, unicode_literals
+
 import contextlib
 import types
+
+import six
 
 from django.db.models.sql import compiler
 
@@ -52,7 +56,10 @@ class QueryInterceptor(object):
             finally:
                 self.tables.setdefault(self._thread_id(), set()).update(compiler.query.tables)
 
-        compiler.SQLCompiler.execute_sql = types.MethodType(execute_sql, None, compiler.SQLCompiler)
+        if six.PY2:
+            compiler.SQLCompiler.execute_sql = types.MethodType(execute_sql, None, compiler.SQLCompiler)
+        else:
+            compiler.SQLCompiler.execute_sql = execute_sql
 
     def _unpatch(self):
         """
@@ -265,7 +272,9 @@ class QueryObserverPool(object):
         Stops all query observers.
         """
 
-        for observer in self._observers.values():
+        # We need to make a copy of the values as `observer.stop()` will cause
+        # the observer dictionary to be modified.
+        for observer in list(self._observers.values()):
             observer.stop()
 
         self._observers = {}

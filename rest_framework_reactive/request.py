@@ -1,6 +1,8 @@
+from __future__ import absolute_import, division, print_function, unicode_literals
+
 import hashlib
 
-from six import string_types
+from six import string_types, text_type
 
 from django.http import request as http_request
 
@@ -50,20 +52,20 @@ class Request(http_request.HttpRequest):
 
         if self._observe_id is None:
             hasher = hashlib.sha256()
-            hasher.update(self.viewset_class.__module__)
-            hasher.update(self.viewset_class.__name__)
-            hasher.update(self.viewset_method)
+            hasher.update(self.viewset_class.__module__.encode('utf8'))
+            hasher.update(self.viewset_class.__name__.encode('utf8'))
+            hasher.update(self.viewset_method.encode('utf8'))
             # Arguments do not need to be taken into account as they are
             # derived from the request path, which is already accounted for.
             for key in sorted(self.GET.keys()):
-                hasher.update(key)
-                hasher.update(self.GET[key])
-            hasher.update(self.path)
-            hasher.update(self.path_info)
+                hasher.update(key.encode('utf8'))
+                hasher.update(self.GET[key].encode('utf8'))
+            hasher.update(self.path.encode('utf8'))
+            hasher.update(self.path_info.encode('utf8'))
             if self._force_auth_user is not None:
-                hasher.update(str(self._force_auth_user.id) or 'anonymous')
+                hasher.update((text_type(self._force_auth_user.id) or 'anonymous').encode('utf8'))
             else:
-                hasher.update('anonymous')
+                hasher.update(b'anonymous')
             self._observe_id = hasher.hexdigest()
 
         return self._observe_id
