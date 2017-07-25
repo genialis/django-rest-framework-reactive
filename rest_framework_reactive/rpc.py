@@ -102,22 +102,22 @@ class WSGIObserverCommandHandler(object):
             command = request.pop('command')
             handler = getattr(self, 'command_%s' % command)
         except (KeyError, ValueError, AttributeError, EOFError):
-            start_response('400 Bad Request', [('Content-Type', 'text/json')])
+            start_response(b'400 Bad Request', [(b'Content-Type', b'text/json')])
             return [json.dumps({'error': "Bad request."})]
 
         try:
             response = handler(**request)
-            start_response('200 OK', [('Content-Type', 'text/json')])
+            start_response(b'200 OK', [(b'Content-Type', b'text/json')])
             return [json.dumps(response)]
         except TypeError:
             logger.exception("Observer request failed with bad request error.")
-            start_response('400 Bad Request', [('Content-Type', 'text/json')])
+            start_response(b'400 Bad Request', [(b'Content-Type', b'text/json')])
             return [json.dumps({'error': "Bad request."})]
         except:
             logger.error("Unhandled exception while executing command '{}'.", command)
             logger.error(traceback.format_exc())
 
-            start_response('500 Internal Server Error', [('Content-Type', 'text/json')])
+            start_response(b'500 Internal Server Error', [(b'Content-Type', b'text/json')])
             return [json.dumps({'error': "Internal server error."})]
         finally:
             db.close_old_connections()
