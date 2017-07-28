@@ -156,6 +156,14 @@ class QueryObserver(object):
             'pool': self._pool.statistics,
         }
 
+    def _get_logging_id(self):
+        """Get logging identifier."""
+        return "{}.{}/{}".format(
+            self._request.viewset_class.__module__,
+            self._request.viewset_class.__name__,
+            self._request.viewset_method,
+        )
+
     def evaluate(self, return_full=True, return_emitted=False):
         """
         Evaluates the query observer and checks if there have been any changes. This function
@@ -209,13 +217,17 @@ class QueryObserver(object):
 
             # Log slow observers.
             if duration > settings['warnings']['max_processing_time']:
-                logger.warning("Slow observer (processing time)",
-                               extra=self._get_logging_extra(duration=duration))
+                logger.warning(
+                    "Slow observed viewset ({})".format(self._get_logging_id()),
+                    extra=self._get_logging_extra(duration=duration)
+                )
 
             # Stop really slow observers.
             if duration > settings['errors']['max_processing_time']:
-                logger.error("Stopped extremely slow observer (processing time)",
-                             extra=self._get_logging_extra(stopped=True, duration=duration))
+                logger.error(
+                    "Stopped extremely slow observed viewset ({})".format(self._get_logging_id()),
+                    extra=self._get_logging_extra(stopped=True, duration=duration)
+                )
                 self.stop()
 
             return result
@@ -225,7 +237,10 @@ class QueryObserver(object):
             # Stop crashing observers.
             self.stop()
 
-            logger.exception("Error while evaluating observer", extra=self._get_logging_extra())
+            logger.exception(
+                "Error while evaluating observer ({})".format(self._get_logging_id()),
+                extra=self._get_logging_extra()
+            )
             return []
         finally:
             self._evaluating -= 1
@@ -314,8 +329,10 @@ class QueryObserver(object):
 
         # Log viewsets with too much output.
         if len(results) > get_queryobserver_settings()['warnings']['max_result_length']:
-            logger.warning("Observed viewset returned too many results",
-                           extra=self._get_logging_extra(results=len(results)))
+            logger.warning(
+                "Observed viewset returned too many results ({})".format(self._get_logging_id()),
+                extra=self._get_logging_extra(results=len(results))
+            )
 
         for order, row in enumerate(results):
             if not isinstance(row, dict):
