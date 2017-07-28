@@ -1,6 +1,6 @@
 from __future__ import absolute_import, division, print_function, unicode_literals
 
-import cPickle as pickle
+import pickle
 
 from django.conf import settings
 from ws4redis import subscriber

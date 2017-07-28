@@ -2,7 +2,7 @@ from __future__ import absolute_import, division, print_function, unicode_litera
 
 import redis
 import redis.connection
-import cPickle as pickle
+import pickle
 import logging
 import traceback
 import json
