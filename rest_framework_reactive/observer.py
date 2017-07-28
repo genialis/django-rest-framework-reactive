@@ -139,6 +139,23 @@ class QueryObserver(object):
 
         return self._last_evaluation
 
+    def _get_logging_extra(self, stopped=False, duration=None, results=None):
+        """Extra information for logger."""
+        return {
+            'stopped': stopped,
+            'duration': duration,
+            'results': results,
+            'observer_id': self.id,
+            'viewset': '{}.{}'.format(
+                self._request.viewset_class.__module__,
+                self._request.viewset_class.__name__
+            ),
+            'method': self._request.viewset_method,
+            'path': self._request.path,
+            'get': self._request.GET,
+            'pool': self._pool.statistics,
+        }
+
     def evaluate(self, return_full=True, return_emitted=False):
         """
         Evaluates the query observer and checks if there have been any changes. This function
@@ -150,8 +167,8 @@ class QueryObserver(object):
 
         # Sanity check (should never happen).
         if self._evaluating < 0:
-            logger.error("Corrupted internal observer state: _evaluating < 0")
-            logger.error("Stopping observer: {}".format(repr(self)))
+            logger.error("Corrupted internal observer state: _evaluating < 0",
+                         extra=self._get_logging_extra(stopped=True))
             self.stop()
             return []
 
@@ -192,14 +209,13 @@ class QueryObserver(object):
 
             # Log slow observers.
             if duration > settings['warnings']['max_processing_time']:
-                # pylint: disable=logging-format-interpolation
-                logger.warning("Slow observer took {} seconds to evaluate.".format(duration))
-                logger.warning("Potentially slow observer is: {}".format(repr(self)))
+                logger.warning("Slow observer (processing time)",
+                               extra=self._get_logging_extra(duration=duration))
 
             # Stop really slow observers.
             if duration > settings['errors']['max_processing_time']:
-                # pylint: disable=logging-format-interpolation
-                logger.error("Stopping slow observer that took {} seconds to evaluate.".format(duration))
+                logger.error("Stopped extremely slow observer (processing time)",
+                             extra=self._get_logging_extra(stopped=True, duration=duration))
                 self.stop()
 
             return result
@@ -209,8 +225,7 @@ class QueryObserver(object):
             # Stop crashing observers.
             self.stop()
 
-            # pylint: disable=logging-format-interpolation
-            logger.exception("Error while evaluating observer: {}".format(repr(self)))
+            logger.exception("Error while evaluating observer", extra=self._get_logging_extra())
             return []
         finally:
             self._evaluating -= 1
@@ -299,9 +314,8 @@ class QueryObserver(object):
 
         # Log viewsets with too much output.
         if len(results) > get_queryobserver_settings()['warnings']['max_result_length']:
-            # pylint: disable=logging-format-interpolation
-            logger.warning("Observed viewset returned {} results.".format(len(results)))
-            logger.warning("Potentially slow observer is: {}".format(repr(self)))
+            logger.warning("Observed viewset returned too many results",
+                           extra=self._get_logging_extra(results=len(results)))
 
         for order, row in enumerate(results):
             if not isinstance(row, dict):
