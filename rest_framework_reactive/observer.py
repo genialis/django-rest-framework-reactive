@@ -377,7 +377,9 @@ class QueryObserver(object):
                 return (added, changed, removed)
 
         if return_full:
-            return self._last_results.values()
+            # Must be wrapped in a list as it would otherwise not be JSON serializable
+            # under Python 3, which returns an unserializable view instance.
+            return list(self._last_results.values())
 
     def emit(self, added, changed, removed):
         """

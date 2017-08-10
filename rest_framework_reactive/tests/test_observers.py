@@ -1,5 +1,6 @@
 from __future__ import absolute_import, division, print_function, unicode_literals
 
+import json
 import pickle
 
 from django import test
@@ -77,6 +78,16 @@ class QueryObserversTestCase(test.TestCase):
         self.assertEquals(added[0], expected_serialized_item)
         self.assertEquals(len(changed), 0)
         self.assertEquals(len(removed), 0)
+
+    def test_item_serialization(self):
+        item = models.ExampleItem.objects.create(name='Example', enabled=True)
+        shortcuts.assign_perm('rest_framework_reactive.view_exampleitem', auth_models.AnonymousUser(), item)
+
+        observer = pool.observe_viewset(self.request(views.ExampleItemViewSet), 'test-subscriber')
+        items = observer.evaluate()
+
+        # Ensure items can be serialized into JSON.
+        json.dumps(items)
 
     def test_observe_viewset(self):
         # Create a request and an observer for it.
