@@ -8,6 +8,7 @@ import traceback
 import json
 
 from django import db
+from django.utils.encoding import force_str
 
 from .__about__ import __version__
 from . import connection
@@ -92,6 +93,12 @@ class WSGIObserverCommandHandler(object):
         Handles an incoming RPC request.
         """
 
+        def respond(status, content):
+            """Response generation helper."""
+            headers = [(str('Content-Type'), str('text/json'))]
+            start_response(force_str(status), headers)
+            return [json.dumps(content)]
+
         content_length = int(environ['CONTENT_LENGTH'])
 
         try:
@@ -102,23 +109,19 @@ class WSGIObserverCommandHandler(object):
             command = request.pop('command')
             handler = getattr(self, 'command_%s' % command)
         except (KeyError, ValueError, AttributeError, EOFError):
-            start_response(b'400 Bad Request', [(b'Content-Type', b'text/json')])
-            return [json.dumps({'error': "Bad request."})]
+            return respond('400 Bad Request', {'error': "Bad request."})
 
         try:
             response = handler(**request)
-            start_response(b'200 OK', [(b'Content-Type', b'text/json')])
-            return [json.dumps(response)]
+            return respond('200 OK', response)
         except TypeError:
             logger.exception("Observer request failed with bad request error.")
-            start_response(b'400 Bad Request', [(b'Content-Type', b'text/json')])
-            return [json.dumps({'error': "Bad request."})]
+            return respond('400 Bad Request', {'error': "Bad request."})
         except:
             logger.error("Unhandled exception while executing command '{}'.", command)
             logger.error(traceback.format_exc())
 
-            start_response(b'500 Internal Server Error', [(b'Content-Type', b'text/json')])
-            return [json.dumps({'error': "Internal server error."})]
+            return respond('500 Internal Server Error', {'error': "Internal server error."})
         finally:
             db.close_old_connections()
 
