@@ -97,7 +97,7 @@ class WSGIObserverCommandHandler(object):
             """Response generation helper."""
             headers = [(str('Content-Type'), str('text/json'))]
             start_response(force_str(status), headers)
-            return [json.dumps(content)]
+            return [json.dumps(content).encode('utf8')]
 
         content_length = int(environ['CONTENT_LENGTH'])
 
