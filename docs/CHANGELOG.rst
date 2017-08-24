@@ -4,6 +4,18 @@ Change Log
 
 All notable changes to this project are documented in this file.
 
+=================
+0.13.0 2017-08-24
+=================
+
+Added
+-----
+* Python 3 compatibility
+* Improve logging for use with Sentry
+
+Fixed
+-----
+* Force evaluation when full results requested
 
 =================
 0.12.0 2017-06-22
