@@ -24,3 +24,8 @@ class ExampleSubItem(models.Model):
         permissions = (
             ("view_examplesubitem", "Can view example sub item"),
         )
+
+
+class ExampleM2MItem(models.Model):
+    value = models.IntegerField(default=1)
+    items = models.ManyToManyField(ExampleItem, related_name='items')

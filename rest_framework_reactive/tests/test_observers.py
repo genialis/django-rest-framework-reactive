@@ -203,6 +203,27 @@ class QueryObserversTestCase(test.TestCase):
         self.assertIn(observer, pool._tables['rest_framework_reactive_exampleitem'])
         self.assertIn(observer, pool._tables['rest_framework_reactive_examplesubitem'])
 
+    def test_aggregations(self):
+        item = models.ExampleItem()
+        item.name = 'Example'
+        item.enabled = False
+        item.save()
+
+        m2m_item = models.ExampleM2MItem()
+        m2m_item.save()
+
+        shortcuts.assign_perm('rest_framework_reactive.view_exampleitem', auth_models.AnonymousUser(), item)
+
+        observer = pool.observe_viewset(
+            self.request(views.AggregationTestViewSet, items=[m2m_item.pk]),
+            'test-subscriber'
+        )
+        observer.evaluate()
+
+        # There should be a dependency on the intermediate table.
+        self.assertIn('rest_framework_reactive_examplem2mitem_items', pool._tables)
+        self.assertIn(observer, pool._tables['rest_framework_reactive_examplem2mitem_items'])
+
     def test_order(self):
         observer = pool.observe_viewset(self.request(views.ExampleItemViewSet, ordering='name'), 'test-subscriber')
         items = observer.evaluate()

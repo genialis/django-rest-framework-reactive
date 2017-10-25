@@ -48,18 +48,18 @@ class QueryInterceptor(object):
         if self.intercepting_queries > 1:
             return
 
-        self._original_execute_sql = compiler.SQLCompiler.execute_sql
+        self._original_as_sql = compiler.SQLCompiler.as_sql
 
-        def execute_sql(compiler, *args, **kwargs):
+        def as_sql(compiler, *args, **kwargs):
             try:
-                return self._original_execute_sql(compiler, *args, **kwargs)
+                return self._original_as_sql(compiler, *args, **kwargs)
             finally:
                 self.tables.setdefault(self._thread_id(), set()).update(compiler.query.tables)
 
         if six.PY2:
-            compiler.SQLCompiler.execute_sql = types.MethodType(execute_sql, None, compiler.SQLCompiler)
+            compiler.SQLCompiler.as_sql = types.MethodType(as_sql, None, compiler.SQLCompiler)
         else:
-            compiler.SQLCompiler.execute_sql = execute_sql
+            compiler.SQLCompiler.as_sql = as_sql
 
     def _unpatch(self):
         """
@@ -72,7 +72,7 @@ class QueryInterceptor(object):
         if self.intercepting_queries:
             return
 
-        compiler.SQLCompiler.execute_sql = self._original_execute_sql
+        compiler.SQLCompiler.as_sql = self._original_as_sql
 
     @contextlib.contextmanager
     def intercept(self, tables):

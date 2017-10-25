@@ -4,6 +4,15 @@ Change Log
 
 All notable changes to this project are documented in this file.
 
+==========
+Unreleased
+==========
+
+Fixed
+-----
+* Dependency detection when subqueries are used
+
+
 =================
 0.13.0 2017-08-24
 =================
