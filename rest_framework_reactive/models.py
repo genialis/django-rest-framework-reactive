@@ -44,3 +44,23 @@ def model_post_delete(sender, instance, **kwargs):
         observer_client.notify_table_remove(table)
 
     transaction.on_commit(notify)
+
+
+@dispatch.receiver(model_signals.m2m_changed)
+def model_m2m_changed(sender, instance, action, **kwargs):
+    """
+    Signal emitted after any M2M relation changes via Django ORM.
+
+    :param sender: M2M intermediate model
+    :param instance: The actual instance that was saved
+    :param action: M2M action
+    """
+
+    def notify():
+        table = sender._meta.db_table
+        if action == 'post_add':
+            observer_client.notify_table_insert(table)
+        elif action in ('post_remove', 'post_clear'):
+            observer_client.notify_table_remove(table)
+
+    transaction.on_commit(notify)

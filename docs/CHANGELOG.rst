@@ -11,6 +11,7 @@ Unreleased
 Fixed
 -----
 * Dependency detection when subqueries are used
+* Reactivity when M2M relationships are modified
 
 
 =================
