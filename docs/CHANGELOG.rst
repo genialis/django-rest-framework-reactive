@@ -8,6 +8,10 @@ All notable changes to this project are documented in this file.
 Unreleased
 ==========
 
+Changed
+-------
+- **BACKWARD INCOMPATIBLE:** Bump Django requirement to version 1.11.x
+
 Fixed
 -----
 * Dependency detection when subqueries are used

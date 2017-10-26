@@ -41,7 +41,7 @@ setup(
 
     packages=find_packages(exclude=['tests']),
     install_requires=[
-        'Django~=1.10.5',
+        'Django~=1.11.6',
         'djangorestframework>=3.4.0',
         'psycopg2>=2.5.0',
         'gevent>=1.0.2',
