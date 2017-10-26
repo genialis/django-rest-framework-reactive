@@ -2,6 +2,12 @@
 Django REST Framework Reactive
 ==============================
 
+|build|
+
+.. |build| image:: https://travis-ci.org/genialis/django-rest-framework-reactive.svg?branch=master
+    :target: https://travis-ci.org/genialis/django-rest-framework-reactive
+    :alt: Build Status
+
 This package enables regular Django REST Framework views to become reactive,
 that is so that client-side applications may get notified of changes to the
 underlying data as soon as they happen, without the need to poll the API
