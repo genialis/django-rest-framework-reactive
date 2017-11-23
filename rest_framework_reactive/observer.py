@@ -13,10 +13,9 @@ from django.core import exceptions as django_exceptions
 from django.http import Http404
 
 from rest_framework import request as api_request
-from ws4redis import publisher, redis_store
 
 from . import exceptions
-from .connection import get_queryobserver_settings
+from .connection import get_queryobserver_settings, get_subscriber_group
 
 # Logger.
 logger = logging.getLogger(__name__)  # pylint: disable=invalid-name
@@ -398,15 +397,17 @@ class QueryObserver(object):
         ):
             # Make a copy of the subscribers set as the publish operation may yield and modify the set.
             for subscriber in self._subscribers.copy():
-                session_publisher = publisher.RedisPublisher(facility=subscriber, broadcast=True)
+                group = get_subscriber_group(subscriber)
                 for row in rows:
-                    session_publisher.publish_message(redis_store.RedisMessage(json.dumps({
-                        'msg': message_type,
-                        'observer': self.id,
-                        'primary_key': self._meta.primary_key,
-                        'order': getattr(row, '_order', None),
-                        'item': row,
-                    })))
+                    group.send({
+                        'text': json.dumps({
+                            'msg': message_type,
+                            'observer': self.id,
+                            'primary_key': self._meta.primary_key,
+                            'order': getattr(row, '_order', None),
+                            'item': row,
+                        })
+                    })
 
     def subscribe(self, subscriber):
         """

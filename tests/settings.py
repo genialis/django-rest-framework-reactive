@@ -30,7 +30,7 @@ INSTALLED_APPS = (
     'django.contrib.staticfiles',
 
     'rest_framework',
-    'ws4redis',
+    'channels',
     'guardian',
 ) + PROJECT_APPS
 
@@ -98,11 +98,16 @@ REDIS_CONNECTION = {
     'db': 0,
 }
 
-WS4REDIS_CONNECTION = REDIS_CONNECTION
-
-WS4REDIS_PREFIX = 'ws'
-
-WS4REDIS_SUBSCRIBER = 'rest_framework_reactive.websockets.QueryObserverSubscriber'
+CHANNEL_LAYERS = {
+    'default': {
+        'BACKEND': 'asgi_redis.RedisChannelLayer',
+        'CONFIG': {
+            'hosts': [(REDIS_CONNECTION['host'], REDIS_CONNECTION['port'])],
+            'expiry': 3600,
+        },
+        'ROUTING': 'rest_framework_reactive.routing.default_channel_routing',
+    },
+}
 
 DJANGO_REST_FRAMEWORK_REACTIVE = {
     'host': 'localhost',

@@ -20,11 +20,10 @@ Install
 Prerequisites
 -------------
 
-The reactive extensions for Django REST Framework currently require the use of
-`django-websocket-redis` for push notifications. When Channels get merged into
-Django mainline, we will probably migrate to using those.
+The reactive extensions for Django REST Framework require the use of `Django Channels`_
+for push notifications via WebSockets.
 
-.. _`django-websocket-redis`: https://github.com/jrief/django-websocket-redis
+.. _`Django Channels`: https://channels.readthedocs.io
 
 From PyPI
 ---------

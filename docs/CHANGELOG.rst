@@ -4,6 +4,15 @@ Change Log
 
 All notable changes to this project are documented in this file.
 
+==========
+Unreleased
+==========
+
+Changed
+-------
+- **BACKWARD INCOMPATIBLE:** Use Django Channels for WebSockets
+
+
 ================
 1.0.0 2017-10-26
 ================

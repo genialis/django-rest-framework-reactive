@@ -49,8 +49,8 @@ setup(
         'django-db-geventpool>=1.20.1',
         'redis>=2.10.5',
         'requests>=2.8.1',
-        'django-websocket-redis>=0.4.6',
-        'django-redis>=4.3.0'
+        'django-redis>=4.3.0',
+        'channels>=1.1.6',
     ],
     extras_require={
         'docs': [
@@ -65,6 +65,7 @@ setup(
             'djangorestframework-filters>=0.9.1',
             'django-guardian>=1.4.2',
             'django-jenkins>=0.17.0',
+            'asgi-redis>=1.4.2',
             'coverage>=3.7.1',
             'pep8>=1.6.2',
             'pylint>=1.4.3',
