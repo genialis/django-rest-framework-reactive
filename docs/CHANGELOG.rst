@@ -4,6 +4,16 @@ Change Log
 
 All notable changes to this project are documented in this file.
 
+==========
+Unreleased
+==========
+
+Fixed
+-----
+* Do not override primary key when an endpoint returns a single item and
+  it already has a primary key set
+
+
 ================
 2.0.0 2017-11-24
 ================

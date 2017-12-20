@@ -291,7 +291,7 @@ class QueryObserver(object):
                                 # Support paginated results.
                                 results = results['results']
                             else:
-                                results[self._meta.primary_key] = 1
+                                results.setdefault(self._meta.primary_key, 1)
                                 results = [collections.OrderedDict(results)]
                         else:
                             raise ValueError("Observable views must return a dictionary or a list of dictionaries!")
