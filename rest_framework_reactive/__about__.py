@@ -8,13 +8,13 @@ __url__ = 'https://github.com/genialis/django-rest-framework-reactive'
 
 # Semantic versioning is used. For more information see:
 # https://packaging.python.org/en/latest/distributing/#semantic-versioning-preferred
-__version__ = '2.0.0'
+__version__ = '2.0.1'
 
 __author__ = 'Genialis d.o.o.'
 __email__ = 'dev-team@genialis.com'
 
 __license__ = 'Apache License (2.0)'
-__copyright__ = '2015-2017, ' + __author__
+__copyright__ = '2015-2018, ' + __author__
 
 __all__ = [
     "__title__", "__summary__", "__url__", "__version__", "__author__",

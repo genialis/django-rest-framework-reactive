@@ -4,14 +4,15 @@ Change Log
 
 All notable changes to this project are documented in this file.
 
-==========
-Unreleased
-==========
+================
+2.0.1 2018-02-05
+================
 
 Fixed
 -----
 * Do not override primary key when an endpoint returns a single item and
   it already has a primary key set
+* Fix Channels dependencies
 
 
 ================
