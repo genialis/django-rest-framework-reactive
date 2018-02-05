@@ -47,10 +47,10 @@ setup(
         'gevent>=1.0.2',
         'psycogreen>=1.0',
         'django-db-geventpool>=1.20.1',
-        'redis>=2.10.5',
+        'redis~=2.10.6',
         'requests>=2.8.1',
         'django-redis>=4.3.0',
-        'channels>=1.1.6',
+        'channels~=1.1.6',
     ],
     extras_require={
         'docs': [
@@ -65,7 +65,7 @@ setup(
             'djangorestframework-filters>=0.9.1',
             'django-guardian>=1.4.2',
             'django-jenkins>=0.17.0',
-            'asgi-redis>=1.4.2',
+            'asgi-redis~=1.4.3',
             'coverage>=3.7.1',
             'pep8>=1.6.2',
             'pylint>=1.4.3',
