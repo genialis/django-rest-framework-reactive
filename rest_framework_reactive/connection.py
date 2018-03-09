@@ -1,35 +1,9 @@
-from __future__ import absolute_import, division, print_function, unicode_literals
-
 from django.conf import settings
-
-from channels import Group
-
-# Redis channel for receiving control messages.
-QUERYOBSERVER_REDIS_CHANNEL = 'django-rest-framework-reactive:control'
-
-
-def get_redis_settings():
-    """
-    Returns the Redis connection configuration.
-    """
-
-    defaults = {
-        'host': 'localhost',
-        'port': 6379,
-        'db': 0,
-    }
-    defaults.update(getattr(settings, 'REDIS_CONNECTION', {}))
-    return defaults
 
 
 def get_queryobserver_settings():
-    """
-    Returns the query observer connection configuration.
-    """
-
+    """Query observer connection configuration."""
     defaults = {
-        'host': 'localhost',
-        'port': 9432,
         # Observers going over these limits will emit warnings.
         'warnings': {
             'max_result_length': 1000,
@@ -46,21 +20,3 @@ def get_queryobserver_settings():
     }
     defaults.update(getattr(settings, 'DJANGO_REST_FRAMEWORK_REACTIVE', {}))
     return defaults
-
-
-def get_subscriber_group_id(subscriber_id):
-    """Return group for specific subscriber.
-
-    :param subscriber_id: Subscriber identifier
-    :return: A channels Group
-    """
-    return 'rest_framework_reactive.subscriber.{}'.format(subscriber_id)
-
-
-def get_subscriber_group(subscriber_id):
-    """Return group for specific subscriber.
-
-    :param subscriber_id: Subscriber identifier
-    :return: A channels Group
-    """
-    return Group(get_subscriber_group_id(subscriber_id))

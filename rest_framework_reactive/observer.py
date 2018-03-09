@@ -1,6 +1,5 @@
-from __future__ import absolute_import, division, print_function, unicode_literals
-
 import collections
+import pickle
 import json
 import logging
 import sys
@@ -8,14 +7,20 @@ import time
 
 import six
 
-from django import db
 from django.core import exceptions as django_exceptions
+from django.db import transaction
 from django.http import Http404
+from django.utils import timezone
 
 from rest_framework import request as api_request
 
-from . import exceptions
-from .connection import get_queryobserver_settings, get_subscriber_group
+from asgiref.sync import async_to_sync
+from channels.layers import get_channel_layer
+
+from . import exceptions, models
+from .connection import get_queryobserver_settings
+from .interceptor import QueryInterceptor
+from .protocol import *
 
 # Logger.
 logger = logging.getLogger(__name__)  # pylint: disable=invalid-name
@@ -25,9 +30,7 @@ OBSERVABLE_OPTIONS_PREFIX = 'observable_'
 
 
 class Options(object):
-    """
-    Query observer options.
-    """
+    """Query observer options."""
 
     # Valid change detection types.
     CHANGE_DETECTION_PUSH = 'push'
@@ -60,32 +63,17 @@ class Options(object):
 
 
 class QueryObserver(object):
-    """
+    """Query observer.
+
     A query observer observes a specific viewset for changes and propagates these
     changes to all interested subscribers.
     """
 
-    # Valid observer statuses.
-    STATUS_NEW = 'new'
-    STATUS_INITIALIZING = 'initializing'
-    STATUS_OBSERVING = 'observing'
-    STATUS_STOPPED = 'stopped'
+    def __init__(self, request):
+        """Create new query observer.
 
-    # Valid message types.
-    MESSAGE_ADDED = 'added'
-    MESSAGE_CHANGED = 'changed'
-    MESSAGE_REMOVED = 'removed'
-
-    def __init__(self, pool, request):
-        """
-        Creates a new query observer.
-
-        :param pool: QueryObserverPool instance
         :param request: A `queryobserver.request.Request` instance
         """
-
-        self.status = QueryObserver.STATUS_NEW
-        self._pool = pool
 
         # Obtain a serializer by asking the viewset to provide one. We instantiate the
         # viewset with a fake request, so that the viewset methods work as expected.
@@ -100,43 +88,10 @@ class QueryObserver(object):
         self._viewset_method = getattr(viewset, request.viewset_method)
         self._meta = Options(viewset, self._viewset_method)
 
-        self._evaluating = 0
-        self._last_evaluation = None
-        self._last_results = collections.OrderedDict()
-        self._subscribers = set()
-        self._dependencies = set()
-        self._initialization_future = None
-        self.id = request.observe_id
-
-    def add_dependency(self, table):
-        """
-        Registers a new dependency for this query observer.
-
-        :param table: Name of the dependent database table
-        """
-
-        if table in self._dependencies:
-            return
-
-        self._dependencies.add(table)
-        self._pool.register_dependency(self, table)
-
     @property
-    def stopped(self):
-        """
-        True if the query observer has been stopped.
-        """
-
-        return self.status == QueryObserver.STATUS_STOPPED
-
-    @property
-    def last_evaluation(self):
-        """
-        Timestamp of last evaluation. May be None if the observer was
-        never evaluated.
-        """
-
-        return self._last_evaluation
+    def id(self):
+        """Unique observer identifier."""
+        return self._request.observe_id
 
     def _get_logging_extra(self, stopped=False, duration=None, results=None):
         """Extra information for logger."""
@@ -152,7 +107,6 @@ class QueryObserver(object):
             'method': self._request.viewset_method,
             'path': self._request.path,
             'get': self._request.GET,
-            'pool': self._pool.statistics,
         }
 
     def _get_logging_id(self):
@@ -164,117 +118,69 @@ class QueryObserver(object):
         )
 
     def evaluate(self, return_full=True, return_emitted=False):
-        """
-        Evaluates the query observer and checks if there have been any changes. This function
-        may yield.
+        """Evaluate the query observer.
 
         :param return_full: True if the full set of rows should be returned
         :param return_emitted: True if the emitted diffs should be returned
         """
 
-        # Sanity check (should never happen).
-        if self._evaluating < 0:
-            logger.error("Corrupted internal observer state: _evaluating < 0",
-                         extra=self._get_logging_extra(stopped=True))
-            self.stop()
-            return []
-
-        if self._evaluating and not return_full:
-            # Ignore evaluate requests if the observer is already being evaluated. Do
-            # not ignore requests when full results are requested as in that case we
-            # need to wait for the results (the caller needs them).
-            return
-
-        self._evaluating += 1
-
         try:
-            # Increment evaluation statistics counter.
-            self._pool._evaluations += 1
-            self._pool._running += 1
             settings = get_queryobserver_settings()
 
-            # After an update is processed, all incoming requests are batched until
-            # the update batch delay passes. Batching is not performed when full
-            # results are requested as in that case we want them as fast as possible.
-            if self._last_evaluation is not None and not return_full:
-                delta = time.time() - self._last_evaluation
-                remaining = settings['update_batch_delay'] - delta
+            with transaction.atomic():
+                # Obtain the observer state and lock it. This prevents an observer from being
+                # processed in parallel from multiple different workers.
+                try:
+                    observer = models.Observer.objects.select_for_update().get(pk=self.id)
+                except models.Observer.DoesNotExist:
+                    # No observer yet, create one.
+                    observer = models.Observer.objects.create(
+                        id=self.id,
+                        request=pickle.dumps(self._request),
+                    )
 
-                if remaining > 0:
-                    try:
-                        self._pool._sleeping += 1
+                # Evaluate the observer.
+                start = time.time()
+                result = self._evaluate(observer, return_full, return_emitted)
+                duration = time.time() - start
 
-                        # We assume that time.sleep has been patched and will correctly yield.
-                        time.sleep(remaining)
-                    finally:
-                        self._pool._sleeping -= 1
+                # Log slow observers.
+                if duration > settings['warnings']['max_processing_time']:
+                    logger.warning(
+                        "Slow observed viewset ({})".format(self._get_logging_id()),
+                        extra=self._get_logging_extra(duration=duration)
+                    )
 
-            start = time.time()
-            result = self._evaluate(return_full, return_emitted)
-            duration = time.time() - start
-            self._last_evaluation = time.time()
-
-            # Log slow observers.
-            if duration > settings['warnings']['max_processing_time']:
-                logger.warning(
-                    "Slow observed viewset ({})".format(self._get_logging_id()),
-                    extra=self._get_logging_extra(duration=duration)
-                )
-
-            # Stop really slow observers.
-            if duration > settings['errors']['max_processing_time']:
-                logger.error(
-                    "Stopped extremely slow observed viewset ({})".format(self._get_logging_id()),
-                    extra=self._get_logging_extra(stopped=True, duration=duration)
-                )
-                self.stop()
+                # Stop really slow observers.
+                if duration > settings['errors']['max_processing_time']:
+                    logger.error(
+                        "Stopped extremely slow observed viewset ({})".format(self._get_logging_id()),
+                        extra=self._get_logging_extra(stopped=True, duration=duration)
+                    )
+                    observer.delete()
 
             return result
-        except exceptions.ObserverStopped:
-            return []
         except:  # pylint: disable=bare-except
-            # Stop crashing observers.
-            self.stop()
-
             logger.exception(
                 "Error while evaluating observer ({})".format(self._get_logging_id()),
                 extra=self._get_logging_extra()
             )
             return []
-        finally:
-            self._evaluating -= 1
-            self._pool._running -= 1
 
-            # Cleanup any leftover connections. This is something that should not be executed
-            # during tests as it would terminate the database connection.
-            is_testing = sys.argv[1:2] == ['test']
-            if not is_testing:
-                db.close_old_connections()
+    def _evaluate(self, observer, return_full=True, return_emitted=False):
+        """Evaluates the query observer.
 
-    def _evaluate(self, return_full=True, return_emitted=False):
-        """
-        Evaluates the query observer and checks if there have been any changes. This function
-        may yield.
+        This method must be run in a transaction with the `observer` locked
+        for update.
 
+        :param observer: Observer state model instance
         :param return_full: True if the full set of rows should be returned
         :param return_emitted: True if the emitted diffs should be returned
         """
-
-        if self.status == QueryObserver.STATUS_STOPPED:
-            raise exceptions.ObserverStopped
-
-        # Be sure to handle status changes before any yields, so that the other greenlets
-        # will see the changes and will be able to wait on the initialization future.
-        if self.status == QueryObserver.STATUS_INITIALIZING:
-            self._initialization_future.wait()
-        elif self.status == QueryObserver.STATUS_NEW:
-            self._initialization_future = self._pool.backend.create_future()
-            self.status = QueryObserver.STATUS_INITIALIZING
-
-        # Evaluate the query (this operation yields).
+        # Evaluate the viewset, intercepting all queries to evaluate dependencies.
         tables = set()
         stop_observer = False
-        with self._pool.query_interceptor.intercept(tables):
+        with QueryInterceptor().intercept(tables):
             try:
                 response = self._viewset_method(
                     self._viewset.request,
@@ -294,7 +200,9 @@ class QueryObserver(object):
                                 results.setdefault(self._meta.primary_key, 1)
                                 results = [collections.OrderedDict(results)]
                         else:
-                            raise ValueError("Observable views must return a dictionary or a list of dictionaries!")
+                            raise ValueError(
+                                "Observable views must return a dictionary or a list of dictionaries!"
+                            )
                 else:
                     results = []
             except Http404:
@@ -304,152 +212,127 @@ class QueryObserver(object):
                 # from the database. In this case, the observer is stopped.
                 stop_observer = True
 
+        # Check if observer should be stopped.
         if stop_observer:
-            self.stop()
+            observer.delete()
             return []
 
+        # Determine who should notify us based on the configured change detection mechanism.
         if self._meta.change_detection == Options.CHANGE_DETECTION_PUSH:
             # Register table dependencies for push observables.
             for table in tables:
-                self.add_dependency(table)
+                models.Dependency.objects.get_or_create(
+                    observer=observer,
+                    table=table,
+                )
         elif self._meta.change_detection == Options.CHANGE_DETECTION_POLL:
             # Register poller.
-            self._pool.register_poller(self)
+            observer.poll_interval = self._meta.poll_interval
+
+            async_to_sync(get_channel_layer().send)(
+                CHANNEL_POLL_OBSERVER,
+                {
+                    'type': TYPE_POLL_OBSERVER,
+                    'observer': self.id,
+                    'interval': self._meta.poll_interval,
+                },
+            )
         else:
             raise NotImplementedError("Change detection mechanism '{}' not implemented.".format(
                 self._meta.change_detection
             ))
 
-        # TODO: Only compute difference between old and new, ideally on the SQL server using hashes.
-        new_results = collections.OrderedDict()
-
-        if self.status == QueryObserver.STATUS_STOPPED:
-            return []
+        # Update last evaluation time.
+        observer.last_evaluation = timezone.now()
+        observer.save()
 
         # Log viewsets with too much output.
-        if len(results) > get_queryobserver_settings()['warnings']['max_result_length']:
+        max_result_length = get_queryobserver_settings()['warnings']['max_result_length']
+        if len(results) > max_result_length:
             logger.warning(
                 "Observed viewset returned too many results ({})".format(self._get_logging_id()),
                 extra=self._get_logging_extra(results=len(results))
             )
 
-        for order, row in enumerate(results):
-            if not isinstance(row, dict):
+        new_results = collections.OrderedDict()
+        for order, item in enumerate(results):
+            if not isinstance(item, dict):
                 raise ValueError("Observable views must return a dictionary or a list of dictionaries!")
 
-            row._order = order
+            item = {
+                'order': order,
+                'data': item,
+            }
+
             try:
-                new_results[row[self._meta.primary_key]] = row
+                new_results[str(item['data'][self._meta.primary_key])] = item
             except KeyError:
-                raise KeyError("Observable view did not return primary key field '{}'!".format(self._meta.primary_key))
+                raise KeyError(
+                    "Observable view did not return primary key field '{}'!".format(self._meta.primary_key)
+                )
 
         # Process difference between old results and new results.
         added = []
         changed = []
         removed = []
-        for row_id, row in six.iteritems(self._last_results):
-            if row_id not in new_results:
-                removed.append(row)
 
-        for row_id, row in six.iteritems(new_results):
-            if row_id not in self._last_results:
-                added.append(row)
-            else:
-                old_row = self._last_results[row_id]
-                if row != old_row:
-                    changed.append(row)
-                if row._order != old_row._order:
-                    changed.append(row)
+        new_ids = list(new_results.keys())
+        removed_qs = observer.items.exclude(primary_key__in=new_results.keys())
+        maybe_changed_qs = observer.items.filter(primary_key__in=new_results.keys())
 
-        self._last_results = new_results
+        # Removed items.
+        removed = list(removed_qs.values('order', 'data'))
+        removed_qs.delete()
 
-        if self.status == QueryObserver.STATUS_INITIALIZING:
-            self.status = QueryObserver.STATUS_OBSERVING
-            if self._initialization_future is not None:
-                future = self._initialization_future
-                self._initialization_future = None
-                future.set()
-        elif self.status == QueryObserver.STATUS_OBSERVING:
-            self.emit(added, changed, removed)
+        # Changed items.
+        for item_id, old_order, old_data in maybe_changed_qs.values_list('primary_key', 'order', 'data'):
+            new_item = new_results[item_id]
+            new_ids.remove(item_id)
+
+            if new_item['data'] != old_data:
+                changed.append(new_item)
+                observer.items.filter(primary_key=item_id).update(data=new_item['data'], order=new_item['order'])
+            elif new_item['order'] != old_order:
+                # TODO: If only order has changed, don't transmit full data (needs frontend support).
+                changed.append(new_item)
+                observer.items.filter(primary_key=item_id).update(order=new_item['order'])
+
+        # Added items.
+        for item_id in new_ids:
+            item = new_results[item_id]
+            added.append(item)
+            observer.items.create(
+                primary_key=item_id,
+                order=item['order'],
+                data=item['data'],
+            )
+
+        # Check whether to emit results.
+        if observer.status == models.Observer.STATUS_OBSERVING:
+            message = {
+                'type': TYPE_ITEM_UPDATE,
+                'observer': self.id,
+                'primary_key': self._meta.primary_key,
+                'added': added,
+                'changed': changed,
+                'removed': removed,
+            }
+
+            for subscriber in observer.subscribers.all():
+                async_to_sync(get_channel_layer().group_send)(
+                    GROUP_SESSIONS.format(session_id=subscriber.session_id),
+                    message,
+                )
 
             if return_emitted:
                 return (added, changed, removed)
+        else:
+            # Switch observer status to OBSERVING.
+            observer.status = models.Observer.STATUS_OBSERVING
+            observer.save()
 
         if return_full:
-            # Must be wrapped in a list as it would otherwise not be JSON serializable
-            # under Python 3, which returns an unserializable view instance.
-            return list(self._last_results.values())
-
-    def emit(self, added, changed, removed):
-        """
-        Notifies all subscribers about query changes.
-
-        :param added: A list of rows there were added
-        :param changed: A list of rows that were changed
-        :param removed: A list of rows that were removed
-        """
-
-        # TODO: Instead of duplicating messages to all subscribers, handle subscriptions within redis.
-        for message_type, rows in (
-            (QueryObserver.MESSAGE_ADDED, added),
-            (QueryObserver.MESSAGE_CHANGED, changed),
-            (QueryObserver.MESSAGE_REMOVED, removed),
-        ):
-            # Make a copy of the subscribers set as the publish operation may yield and modify the set.
-            for subscriber in self._subscribers.copy():
-                group = get_subscriber_group(subscriber)
-                for row in rows:
-                    group.send({
-                        'text': json.dumps({
-                            'msg': message_type,
-                            'observer': self.id,
-                            'primary_key': self._meta.primary_key,
-                            'order': getattr(row, '_order', None),
-                            'item': row,
-                        })
-                    })
-
-    def subscribe(self, subscriber):
-        """
-        Adds a new subscriber.
-        """
-
-        self._subscribers.add(subscriber)
-
-    def unsubscribe(self, subscriber):
-        """
-        Unsubscribes a specific subscriber to this query observer. If no subscribers
-        are left, this query observer is stopped.
-        """
-
-        try:
-            self._subscribers.remove(subscriber)
-        except KeyError:
-            pass
-
-        if not self._subscribers:
-            self.stop()
-
-    def stop(self):
-        """
-        Stops this query observer.
-        """
-
-        if self.status == QueryObserver.STATUS_STOPPED:
-            return
-
-        self.status = QueryObserver.STATUS_STOPPED
-        self._last_results.clear()
-
-        # Unregister all dependencies.
-        for dependency in self._dependencies:
-            self._pool.unregister_dependency(self, dependency)
-
-        # Unsubscribe all subscribers.
-        for subscriber in self._subscribers:
-            self._pool._remove_subscriber(self, subscriber)
-
-        self._pool._remove_observer(self)
+            return [item['data'] for item in new_results.values()]
 
     def __eq__(self, other):
         return self.id == other.id
@@ -458,7 +341,29 @@ class QueryObserver(object):
         return hash(self.id)
 
     def __repr__(self):
-        return '<QueryObserver id="{id}" request={request}>'.format(
+        return '<QueryObserver: id={id} request={request}>'.format(
             id=self.id,
             request=repr(self._request)
         )
+
+
+def add_subscriber(session_id, observer_id):
+    """Add subscriber to the given observer.
+
+    :param session_id: Subscriber's session identifier
+    :param observer_id: Observer identifier
+    """
+    observer = models.Observer.objects.get(pk=observer_id)
+    observer.subscribers.add(
+        models.Subscriber.objects.get_or_create(session_id=session_id)[0]
+    )
+
+
+def remove_subscriber(session_id, observer_id):
+    """Remove subscriber from the given observer.
+
+    :param session_id: Subscriber's session identifier
+    :param observer_id: Observer identifier
+    """
+    observer = models.Observer.objects.get(pk=observer_id)
+    observer.subscribers.filter(session_id=session_id).delete()

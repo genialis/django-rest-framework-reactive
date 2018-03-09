@@ -1,5 +1,3 @@
-from __future__ import absolute_import, division, print_function, unicode_literals
-
 import hashlib
 
 from six import string_types, text_type
@@ -11,9 +9,9 @@ OBSERVABLE_QUERY_PARAMETER = 'observe'
 
 
 class Request(http_request.HttpRequest):
-    """
-    A fake request used by the query observer to interact with the DRF views. This
-    request class is picklable.
+    """Request used by the query observer to interact with the viewsets.
+
+    This request class is picklable.
     """
 
     def __init__(self, viewset_class, viewset_method, request, args=None, kwargs=None):
@@ -45,11 +43,7 @@ class Request(http_request.HttpRequest):
 
     @property
     def observe_id(self):
-        """
-        Unique identifier that identifies the observer, which will be handling
-        this request.
-        """
-
+        """Unique identifier that identifies the observer."""
         if self._observe_id is None:
             hasher = hashlib.sha256()
             hasher.update(self.viewset_class.__module__.encode('utf8'))
@@ -99,7 +93,7 @@ class Request(http_request.HttpRequest):
         self._observe_id = state['observe_id']
 
     def __repr__(self):
-        return '<Request viewset={viewset} method="{method}" path="{path}" query={get}>'.format(
+        return '<Request: viewset={viewset} method={method} path={path} query={get}>'.format(
             viewset=repr(self.viewset_class),
             method=self.viewset_method,
             path=self.path,

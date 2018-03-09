@@ -1,50 +1,68 @@
-from __future__ import absolute_import, division, print_function, unicode_literals
+import inspect
 
-from rest_framework import response
+from rest_framework import response, viewsets
 
-from . import client, observer, request as observer_request
-
-observer_client = client.QueryObserverClient()
+from . import observer, request as observer_request
 
 
-def observable(method):
+def observable(method_or_viewset):
+    """Make the specified ViewSet or ViewSet method  observable.
+
+    Decorating a ViewSet class is the same as decorating its `list` method.
+
+    If the decorated method returns a response containing a list of items, it
+    must use the provided `LimitOffsetPagination` for any pagination. In case
+    a non-list response is returned, the resulting item will be wrapped into
+    a list.
+
+    When multiple decorators are used, `observable` must be the first one to be
+    applied as it needs access to the method name.
     """
-    A decorator, which makes the specified ViewSet method observable. If the
-    decorated method returns a response containing a list of items, it must use
-    the provided `LimitOffsetPagination` for any pagination. In case a non-list
-    response is returned, the resulting item will be wrapped into a list.
 
-    When multiple decorators are used, `observable` must be the first one
-    to be applied as it needs access to the method name.
-    """
+    if inspect.isclass(method_or_viewset):
+        list_method = getattr(method_or_viewset, 'list', None)
+        if list_method is not None:
+            method_or_viewset.list = observable(list_method)
+
+        return method_or_viewset
+
+    # Do not decorate an already observable method twice.
+    if getattr(method_or_viewset, 'is_observable', False):
+        return method_or_viewset
 
     def wrapper(self, request, *args, **kwargs):
         if observer_request.OBSERVABLE_QUERY_PARAMETER in request.query_params:
             # TODO: Validate the session identifier.
             session_id = request.query_params[observer_request.OBSERVABLE_QUERY_PARAMETER]
-            data = observer_client.create_observer(
-                observer_request.Request(self.__class__, method.__name__, request, args, kwargs),
-                session_id
-            )
-            return response.Response(data)
+
+            # Create request and subscribe the session to given observer.
+            request = observer_request.Request(self.__class__, method_or_viewset.__name__, request, args, kwargs)
+
+            # Create and evaluate observer.
+            instance = observer.QueryObserver(request)
+            data = instance.evaluate()
+            observer.add_subscriber(session_id, instance.id)
+
+            return response.Response({
+                'observer': instance.id,
+                'items': data,
+            })
         else:
             # Non-reactive API.
-            return method(self, request, *args, **kwargs)
+            return method_or_viewset(self, request, *args, **kwargs)
 
     wrapper.is_observable = True
 
     # Copy over any special observable attributes.
-    for attribute in dir(method):
+    for attribute in dir(method_or_viewset):
         if attribute.startswith(observer.OBSERVABLE_OPTIONS_PREFIX):
-            setattr(wrapper, attribute, getattr(method, attribute))
+            setattr(wrapper, attribute, getattr(method_or_viewset, attribute))
 
     return wrapper
 
 
 def primary_key(name):
-    """
-    A decorator, which configures the primary key that should be used for
-    tracking objects in an observable method.
+    """Set primary key for tracking observable items.
 
     :param name: Name of the primary key field
     """
@@ -57,8 +75,9 @@ def primary_key(name):
 
 
 def polling_observable(interval):
-    """
-    A decorator, which configures the given observable as a polling
+    """Set polling interval for a polling observable.
+
+    A decorator which configures the given observable as a polling
     observable. Instead of tracking changes based on notifications from
     the ORM, the observer is polled periodically.
 

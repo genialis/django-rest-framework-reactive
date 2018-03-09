@@ -21,6 +21,7 @@ MIDDLEWARE_CLASSES = (
 # Apps from this project
 PROJECT_APPS = (
     'rest_framework_reactive',
+    'rest_framework_reactive.tests.apps.QueryObserverTestsConfig',
 )
 
 INSTALLED_APPS = (
@@ -69,7 +70,7 @@ pgport = int(os.environ.get('DRFR_POSTGRESQL_PORT', 55435))
 
 DATABASES = {
     'default': {
-        'ENGINE': 'django.db.backends.postgresql_psycopg2',
+        'ENGINE': 'django.db.backends.postgresql',
         'NAME': pgname,
         'USER': pguser,
         'HOST': pghost,
@@ -92,26 +93,15 @@ REST_FRAMEWORK = {
     ),
 }
 
-REDIS_CONNECTION = {
-    'host': 'localhost',
-    'port': int(os.environ.get('DRFR_REDIS_PORT', 56380)),
-    'db': 0,
-}
-
 CHANNEL_LAYERS = {
     'default': {
-        'BACKEND': 'asgi_redis.RedisChannelLayer',
-        'CONFIG': {
-            'hosts': [(REDIS_CONNECTION['host'], REDIS_CONNECTION['port'])],
-            'expiry': 3600,
-        },
-        'ROUTING': 'rest_framework_reactive.routing.default_channel_routing',
+        'BACKEND': 'channels.layers.InMemoryChannelLayer',
     },
 }
 
+ASGI_APPLICATION = 'rest_framework_reactive.routing.application'
+
 DJANGO_REST_FRAMEWORK_REACTIVE = {
-    'host': 'localhost',
-    'port': 9432,
     # Set update batch delay to zero during tests as otherwise they can be delayed
     # and cause test timeouts.
     'update_batch_delay': 0,
