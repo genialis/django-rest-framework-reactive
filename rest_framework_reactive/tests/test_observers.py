@@ -1,54 +1,22 @@
-from __future__ import absolute_import, division, print_function, unicode_literals
-
 import json
 import pickle
 
 from django import test
-from django.apps import apps
-from django.conf import settings
-from django.core import management
-from django.test import utils
 from django.contrib.auth import models as auth_models
 
 from guardian import shortcuts
 from rest_framework import test as api_test, request as api_request
 
 from . import models, views
-from .. import request as observer_request
-from ..pool import pool
-
-# Override settings used during tests so we can include some test-only models.
-TEST_SETTINGS = {
-    'DEBUG': True,
-    'INSTALLED_APPS': settings.INSTALLED_APPS + ('rest_framework_reactive.tests.apps.QueryObserverTestsConfig',),
-}
+from rest_framework_reactive import models as observer_models
+from rest_framework_reactive import request as observer_request
+from rest_framework_reactive.observer import QueryObserver
 
 # Create test request factory.
 factory = api_test.APIRequestFactory()
 
 
-@utils.override_settings(**TEST_SETTINGS)
 class QueryObserversTestCase(test.TestCase):
-    def setUp(self):
-        apps.clear_cache()
-        management.call_command('migrate', verbosity=0, interactive=False, load_initial_data=False)
-
-        super(QueryObserversTestCase, self).setUp()
-
-    @classmethod
-    def setUpClass(cls):
-        super(QueryObserversTestCase, cls).setUpClass()
-
-        # Register observable viewsets.
-        pool.register_viewset(views.ExampleItemViewSet)
-        pool.register_viewset(views.ExampleSubItemViewSet)
-        pool.register_viewset(views.PaginatedViewSet)
-
-    def tearDown(self):
-        super(QueryObserversTestCase, self).tearDown()
-
-        pool.stop_all()
-
     def request(self, viewset_class, **kwargs):
         request = observer_request.Request(
             viewset_class,
@@ -60,7 +28,7 @@ class QueryObserversTestCase(test.TestCase):
         return pickle.loads(pickle.dumps(request))
 
     def test_paginated_viewset(self):
-        observer = pool.observe_viewset(self.request(views.PaginatedViewSet, offset=0, limit=10), 'test-subscriber')
+        observer = QueryObserver(self.request(views.PaginatedViewSet, offset=0, limit=10))
         items = observer.evaluate()
 
         self.assertEquals(len(items), 0)
@@ -75,7 +43,7 @@ class QueryObserversTestCase(test.TestCase):
 
         self.assertEquals(len(added), 10)
         expected_serialized_item = {'id': items[0].pk, 'name': items[0].name, 'enabled': items[0].enabled}
-        self.assertEquals(added[0], expected_serialized_item)
+        self.assertEquals(added[0]['data'], expected_serialized_item)
         self.assertEquals(len(changed), 0)
         self.assertEquals(len(removed), 0)
 
@@ -83,7 +51,7 @@ class QueryObserversTestCase(test.TestCase):
         item = models.ExampleItem.objects.create(name='Example', enabled=True)
         shortcuts.assign_perm('rest_framework_reactive.view_exampleitem', auth_models.AnonymousUser(), item)
 
-        observer = pool.observe_viewset(self.request(views.ExampleItemViewSet), 'test-subscriber')
+        observer = QueryObserver(self.request(views.ExampleItemViewSet))
         items = observer.evaluate()
 
         # Ensure items can be serialized into JSON.
@@ -91,7 +59,7 @@ class QueryObserversTestCase(test.TestCase):
 
     def test_observe_viewset(self):
         # Create a request and an observer for it.
-        observer = pool.observe_viewset(self.request(views.ExampleItemViewSet), 'test-subscriber')
+        observer = QueryObserver(self.request(views.ExampleItemViewSet))
         items = observer.evaluate()
 
         self.assertEquals(observer.id, 'fdd1312a8082540528908c32f4a94cac55365ef7acadc8e5ae8d4795cd7b5fa6')
@@ -111,7 +79,7 @@ class QueryObserversTestCase(test.TestCase):
 
         self.assertEquals(len(added), 1)
         expected_serialized_item = {'id': item.pk, 'name': item.name, 'enabled': item.enabled}
-        self.assertEquals(added[0], expected_serialized_item)
+        self.assertEquals(added[0]['data'], expected_serialized_item)
         self.assertEquals(len(changed), 0)
         self.assertEquals(len(removed), 0)
 
@@ -123,7 +91,7 @@ class QueryObserversTestCase(test.TestCase):
         added, changed, removed = observer.evaluate(return_emitted=True)
         self.assertEquals(len(added), 0)
         self.assertEquals(len(changed), 1)
-        self.assertEquals(changed[0], expected_serialized_item)
+        self.assertEquals(changed[0]['data'], expected_serialized_item)
         self.assertEquals(len(removed), 0)
 
         # Remove the first item.
@@ -145,14 +113,14 @@ class QueryObserversTestCase(test.TestCase):
 
         added, changed, removed = observer.evaluate(return_emitted=True)
         self.assertEquals(len(added), 2)
-        self.assertEquals(added[0], {'id': item2.pk, 'name': item2.name, 'enabled': item2.enabled})
-        self.assertEquals(added[1], {'id': item3.pk, 'name': item3.name, 'enabled': item3.enabled})
+        self.assertEquals(added[0]['data'], {'id': item2.pk, 'name': item2.name, 'enabled': item2.enabled})
+        self.assertEquals(added[1]['data'], {'id': item3.pk, 'name': item3.name, 'enabled': item3.enabled})
         self.assertEquals(len(changed), 0)
         self.assertEquals(len(removed), 1)
-        self.assertEquals(removed[0], expected_serialized_item)
+        self.assertEquals(removed[0]['data'], expected_serialized_item)
 
     def test_conditions(self):
-        observer = pool.observe_viewset(self.request(views.ExampleItemViewSet, enabled=True), 'test-subscriber')
+        observer = QueryObserver(self.request(views.ExampleItemViewSet, enabled=True))
         items = observer.evaluate()
 
         self.assertEquals(observer.id, '0c2544b340aeb1919180ee6898a8e117de76b4a09dcedff7d6d172f3caa677c2')
@@ -177,7 +145,7 @@ class QueryObserversTestCase(test.TestCase):
         added, changed, removed = observer.evaluate(return_emitted=True)
 
         self.assertEquals(len(added), 1)
-        self.assertEquals(added[0], {'id': item.pk, 'name': item.name, 'enabled': item.enabled})
+        self.assertEquals(added[0]['data'], {'id': item.pk, 'name': item.name, 'enabled': item.enabled})
         self.assertEquals(len(changed), 0)
         self.assertEquals(len(removed), 0)
 
@@ -195,13 +163,16 @@ class QueryObserversTestCase(test.TestCase):
         shortcuts.assign_perm('rest_framework_reactive.view_exampleitem', auth_models.AnonymousUser(), item)
         shortcuts.assign_perm('rest_framework_reactive.view_examplesubitem', auth_models.AnonymousUser(), subitem)
 
-        observer = pool.observe_viewset(self.request(views.ExampleSubItemViewSet, parent__enabled=True), 'test-subscriber')
+        observer = QueryObserver(self.request(views.ExampleSubItemViewSet, parent__enabled=True))
         items = observer.evaluate()
 
         self.assertEquals(observer.id, '009955bdb64c21f679a7dfa2f747d6025ffef3185e5e01805662ebe8ca89c1d3')
         self.assertEquals(len(items), 0)
-        self.assertIn(observer, pool._tables['rest_framework_reactive_exampleitem'])
-        self.assertIn(observer, pool._tables['rest_framework_reactive_examplesubitem'])
+
+        observer_state = observer_models.Observer.objects.get(pk=observer.id)
+        dependencies = observer_state.dependencies.all().values_list('table', flat=True)
+        self.assertIn('rest_framework_reactive_tests_exampleitem', dependencies)
+        self.assertIn('rest_framework_reactive_tests_examplesubitem', dependencies)
 
     def test_aggregations(self):
         item = models.ExampleItem()
@@ -214,18 +185,16 @@ class QueryObserversTestCase(test.TestCase):
 
         shortcuts.assign_perm('rest_framework_reactive.view_exampleitem', auth_models.AnonymousUser(), item)
 
-        observer = pool.observe_viewset(
-            self.request(views.AggregationTestViewSet, items=[m2m_item.pk]),
-            'test-subscriber'
-        )
+        observer = QueryObserver(self.request(views.AggregationTestViewSet, items=[m2m_item.pk]))
         observer.evaluate()
 
         # There should be a dependency on the intermediate table.
-        self.assertIn('rest_framework_reactive_examplem2mitem_items', pool._tables)
-        self.assertIn(observer, pool._tables['rest_framework_reactive_examplem2mitem_items'])
+        observer_state = observer_models.Observer.objects.get(pk=observer.id)
+        dependencies = observer_state.dependencies.all().values_list('table', flat=True)
+        self.assertIn('rest_framework_reactive_tests_examplem2mitem_items', dependencies)
 
     def test_order(self):
-        observer = pool.observe_viewset(self.request(views.ExampleItemViewSet, ordering='name'), 'test-subscriber')
+        observer = QueryObserver(self.request(views.ExampleItemViewSet, ordering='name'))
         items = observer.evaluate()
 
         self.assertEquals(len(items), 0)
@@ -240,8 +209,8 @@ class QueryObserversTestCase(test.TestCase):
         added, changed, removed = observer.evaluate(return_emitted=True)
 
         self.assertEquals(len(added), 1)
-        self.assertEquals(added[0], {'id': item.pk, 'name': item.name, 'enabled': item.enabled})
-        self.assertEquals(added[0]._order, 0)
+        self.assertEquals(added[0]['data'], {'id': item.pk, 'name': item.name, 'enabled': item.enabled})
+        self.assertEquals(added[0]['order'], 0)
         self.assertEquals(len(changed), 0)
         self.assertEquals(len(removed), 0)
 
@@ -255,12 +224,12 @@ class QueryObserversTestCase(test.TestCase):
         added, changed, removed = observer.evaluate(return_emitted=True)
 
         self.assertEquals(len(added), 1)
-        self.assertEquals(added[0], {'id': item2.pk, 'name': item2.name, 'enabled': item2.enabled})
-        self.assertEquals(added[0]._order, 0)
+        self.assertEquals(added[0]['data'], {'id': item2.pk, 'name': item2.name, 'enabled': item2.enabled})
+        self.assertEquals(added[0]['order'], 0)
         # Check that the first item has changed, because its order has changed.
         self.assertEquals(len(changed), 1)
-        self.assertEquals(changed[0], {'id': item.pk, 'name': item.name, 'enabled': item.enabled})
-        self.assertEquals(changed[0]._order, 1)
+        self.assertEquals(changed[0]['data'], {'id': item.pk, 'name': item.name, 'enabled': item.enabled})
+        self.assertEquals(changed[0]['order'], 1)
         self.assertEquals(len(removed), 0)
 
         item3 = models.ExampleItem()
@@ -272,9 +241,9 @@ class QueryObserversTestCase(test.TestCase):
 
         added, changed, removed = observer.evaluate(return_emitted=True)
         self.assertEquals(len(added), 1)
-        self.assertEquals(added[0], {'id': item3.pk, 'name': item3.name, 'enabled': item3.enabled})
-        self.assertEquals(added[0]._order, 1)
+        self.assertEquals(added[0]['data'], {'id': item3.pk, 'name': item3.name, 'enabled': item3.enabled})
+        self.assertEquals(added[0]['order'], 1)
         self.assertEquals(len(changed), 1)
-        self.assertEquals(changed[0], {'id': item.pk, 'name': item.name, 'enabled': item.enabled})
-        self.assertEquals(changed[0]._order, 2)
+        self.assertEquals(changed[0]['data'], {'id': item.pk, 'name': item.name, 'enabled': item.enabled})
+        self.assertEquals(changed[0]['order'], 2)
         self.assertEquals(len(removed), 0)

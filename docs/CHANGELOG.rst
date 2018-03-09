@@ -4,6 +4,16 @@ Change Log
 
 All notable changes to this project are documented in this file.
 
+==========
+Unreleased
+==========
+
+Changed
+-------
+* **BACKWARD INCOMPATIBLE:** Port to Django Channels 2.1 and add support
+  for running multiple workers.
+
+
 ================
 2.0.1 2018-02-05
 ================

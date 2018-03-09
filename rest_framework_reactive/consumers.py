@@ -1,29 +1,105 @@
-from channels.generic.websockets import JsonWebsocketConsumer
+import asyncio
+import pickle
 
-from .connection import get_subscriber_group_id
-from .client import QueryObserverClient
+from channels.consumer import AsyncConsumer, SyncConsumer
+from channels.generic.websocket import JsonWebsocketConsumer
+
+from .models import Observer, Subscriber
+from .observer import QueryObserver
+from .protocol import GROUP_SESSIONS, TYPE_POLL_OBSERVER
 
 
-class ObserversConsumer(JsonWebsocketConsumer):
-    """Consumer for handling observer websockets."""
+class PollObserversConsumer(AsyncConsumer):
+    """Consumer for polling observers."""
+
+    async def poll_observer(self, message):
+        """Poll observer after a delay."""
+        print('poll observer rq', message)
+        # Sleep until we need to notify the observer.
+        await asyncio.sleep(message['interval'])
+        print('sleep done, sending notify')
+
+        # Dispatch task to evaluate the observable.
+        await self.send({
+            'type': TYPE_POLL_OBSERVER,
+            'observer': message['observer'],
+        })
+
+
+class WorkerConsumer(SyncConsumer):
+    """Worker consumer."""
 
     def __init__(self, *args, **kwargs):
-        """Initialize consumer."""
-        self._client = QueryObserverClient()
-        super(ObserversConsumer, self).__init__(*args, **kwargs)
+        """Construct observer worker consumer."""
+        self._executor_cache = {}
+        super().__init__(*args, **kwargs)
 
-    def connection_groups(self, subscriber_id, **kwargs):
-        """Groups the client should be in."""
-        return [get_subscriber_group_id(subscriber_id)]
+    def _get_executor(self, state):
+        """Get executor for given observer's state."""
+        try:
+            return self._executor_cache[state.pk]
+        except KeyError:
+            executor = QueryObserver(pickle.loads(state.request))
+            self._executor_cache[state.pk] = executor
+            return executor
 
-    def connect(self, message, subscriber_id, **kwargs):
-        """New client has connected."""
-        self.message.reply_channel.send({'accept': True})
+    def _evaluate(self, state):
+        """Evaluate observer based on state."""
+        # Load state into an executor.
+        executor = self._get_executor(state)
 
-    def receive(self, content, subscriber_id, **kwargs):
-        """Message received from client."""
-        pass
+        # Evaluate observer.
+        executor.evaluate(return_full=False)
 
-    def disconnect(self, message, subscriber_id, **kwargs):
-        """Client has disconnected."""
-        self._client.notify_subscriber_gone(subscriber_id)
+    def orm_notify_table(self, message):
+        """Process notification from ORM."""
+        # Find all observers with dependencies on the given table.
+        observers = Observer.objects.filter(dependencies__table=message['table']).distinct()
+
+        for state in observers:
+            self._evaluate(state)
+
+    def poll_observer(self, message):
+        """Evaluate poll observer."""
+        try:
+            observer = Observer.objects.get(pk=message['observer'])
+        except Observer.DoesNotExist:
+            return
+
+        self._evaluate(observer)
+
+
+class ClientConsumer(JsonWebsocketConsumer):
+    """Client consumer."""
+
+    def websocket_connect(self, message):
+        """Called when WebSocket connection is established."""
+        self.session_id = self.scope['url_route']['kwargs']['subscriber_id']
+        super().websocket_connect(message)
+
+    @property
+    def groups(self):
+        """Groups this channel should add itself to."""
+        if not hasattr(self, 'session_id'):
+            return []
+
+        return [GROUP_SESSIONS.format(session_id=self.session_id)]
+
+    def disconnect(self, code):
+        """Called when WebSocket connection is closed."""
+        Subscriber.objects.filter(session_id=self.session_id).delete()
+
+    def observer_update(self, message):
+        """Called when update from observer is received."""
+        message.pop('type')
+
+        # Demultiplex observer update into multiple messages.
+        for action in ('added', 'changed', 'removed'):
+            for item in message[action]:
+                self.send_json({
+                    'msg': action,
+                    'observer': message['observer'],
+                    'primary_key': message['primary_key'],
+                    'order': item['order'],
+                    'item': item['data'],
+                })

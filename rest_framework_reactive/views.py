@@ -1,23 +1,16 @@
-from __future__ import absolute_import, division, print_function, unicode_literals
-
 from rest_framework import views, response
 
-from . import client
-
-observer_client = client.QueryObserverClient()
+from . import observer
 
 
 class QueryObserverUnsubscribeView(views.APIView):
     def post(self, request):
-        """
-        Handles a query observer unsubscription request.
-        """
-
+        """Handle a query observer unsubscription request."""
         try:
-            observer = request.query_params['observer']
-            subscriber = request.query_params['subscriber']
+            observer_id = request.query_params['observer']
+            session_id = request.query_params['subscriber']
         except KeyError:
             return response.Response(status=400)
 
-        observer_client.unsubscribe_observer(observer, subscriber)
+        observer.remove_subscriber(session_id, observer_id)
         return response.Response()

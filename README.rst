@@ -53,63 +53,35 @@ version from the ``master`` branch, use:
 Configure
 =========
 
-There are several things that need to be configured in the Django settings file:
+First, add ``rest_framework_reactive`` to ``INSTALLED_APPS``.
 
-* ``rest_framework_reactive`` needs to be added to ``INSTALLED_APPS``.
-* ``DEFAULT_PAGINATION_CLASS`` needs to be set to ``rest_framework_reactive.pagination.LimitOffsetPagination`` (optionally, this pagination class can instead be set for all viewsets configured for reactivity).
-* ``WS4REDIS_SUBSCRIBER`` needs to be set to ``rest_framework_reactive.websockets.QueryObserverSubscriber``.
-* ``DJANGO_REST_FRAMEWORK_REACTIVE`` needs to be configured with hostname and port where the internal RPC will live. It should be set to something like::
-
-     DJANGO_REST_FRAMEWORK_REACTIVE = {
-        'host': 'localhost',
-        'port': 9432,
-     }
-
-  The hostname and port must be such that they are reachable from the Django application server.
-
-
-Each ``ViewSet`` that should support reactivity, must be registered by using:
+Configure your Django Channels ``routing.py`` to include the required paths:
 
 .. code::
 
-   from rest_framework_reactive.pool import pool
-   pool.register_viewset(MyViewSet)
+    from django.conf.urls import url
 
-The best place to do this is inside ``models.py`` or better, inside the ``ready`` handler
-of an ``AppConfig``.
+    from channels.routing import ChannelNameRouter, ProtocolTypeRouter, URLRouter
 
-At the moment, you are required to change your project's ``manage.py`` to monkey patch
-the ``runobservers`` command with support for gevent coroutines. Note that regular Django
-application server still runs as normal, only the observer process runs using coroutines.
+    from rest_framework_reactive.consumers import ClientConsumer, PollObserversConsumer, WorkerConsumer
+    from rest_framework_reactive.protocol import CHANNEL_POLL_OBSERVER, CHANNEL_WORKER_NOTIFY
 
-The modified ``manage.py`` should look as follows:
+    application = ProtocolTypeRouter({
+        # Client-facing consumers.
+        'websocket': URLRouter([
+            # To change the prefix, you can import ClientConsumer in your custom
+            # Channels routing definitions instead of using these defaults.
+            url(r'^ws/(?P<subscriber_id>.+)$', ClientConsumer),
+        ]),
 
-.. code::
+        # Background worker consumers.
+        'channel': ChannelNameRouter({
+            CHANNEL_POLL_OBSERVER: PollObserversConsumer,
+            CHANNEL_WORKER_NOTIFY: WorkerConsumer,
+        })
+    })
 
-   #!/usr/bin/env python
-   import os
-   import sys
-
-   if __name__ == "__main__":
-       os.environ.setdefault("DJANGO_SETTINGS_MODULE", "genesis.settings.development")
-
-       # This is needed here so the monkey patching is done before Django ORM is loaded. If we
-       # do it inside the 'runobservers' management command, it is already too late as a database
-       # connection has already been created using thread identifiers, which become invalid
-       # after monkey patching.
-       if 'runobservers' in sys.argv:
-           import gevent.monkey
-           import psycogreen.gevent
-
-           # Patch the I/O primitives and psycopg2 database driver to be greenlet-enabled.
-           gevent.monkey.patch_all()
-           psycogreen.gevent.patch_psycopg()
-
-       from django.core.management import execute_from_command_line
-
-       execute_from_command_line(sys.argv)
-
-And finally, ``urls.py`` need to be updated to include some additional paths:
+Also, ``urls.py`` need to be updated to include some additional paths:
 
 .. code::
 
@@ -123,9 +95,8 @@ Run
 ===
 
 In addition to running a Django application server instance, you need to also run a
-separate observer process. You may start it by running:
+separate observer worker process (or multiple of them). You may start it by running:
 
 .. code::
 
-   python manage.py runobservers
-
+   python manage.py runworker rest_framework_reactive.worker rest_framework_reactive.poll_observer

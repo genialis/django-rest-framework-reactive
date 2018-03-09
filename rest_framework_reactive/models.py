@@ -1,66 +1,72 @@
-from __future__ import absolute_import, division, print_function, unicode_literals
+from django.contrib.postgres.fields import JSONField
+from django.db import models, transaction
 
-from django import dispatch
-from django.db import transaction
-from django.db.models import signals as model_signals
+class Observer(models.Model):
+    """State for an observer."""
 
-from . import client
+    # Observer status.
+    STATUS_NEW = 'new'
+    STATUS_OBSERVING = 'observing'
+    STATUS_STOPPED = 'stopped'
 
-# Setup model notifications.
-observer_client = client.QueryObserverClient()
+    STATUS_CHOICES = (
+        (STATUS_NEW, "New"),
+        (STATUS_OBSERVING, "Observing"),
+        (STATUS_STOPPED, "Stopped"),
+    )
 
+    id = models.CharField(primary_key=True, max_length=64)
+    status = models.CharField(max_length=15, choices=STATUS_CHOICES, default=STATUS_NEW)
+    request = models.BinaryField()
+    last_evaluation = models.DateTimeField(auto_now_add=True)
+    poll_interval = models.IntegerField(null=True)
+    subscribers = models.ManyToManyField('Subscriber')
 
-@dispatch.receiver(model_signals.post_save)
-def model_post_save(sender, instance, created=False, **kwargs):
-    """
-    Signal emitted after any model is saved via Django ORM.
-
-    :param sender: Model class that was saved
-    :param instance: The actual instance that was saved
-    :param created: True if a new row was created
-    """
-
-    def notify():
-        table = sender._meta.db_table
-        if created:
-            observer_client.notify_table_insert(table)
-        else:
-            observer_client.notify_table_update(table)
-
-    transaction.on_commit(notify)
+    def __str__(self):
+        return 'id={id}'.format(id=self.id)
 
 
-@dispatch.receiver(model_signals.post_delete)
-def model_post_delete(sender, instance, **kwargs):
-    """
-    Signal emitted after any model is deleted via Django ORM.
+class Item(models.Model):
+    """Item part of the observer's result set."""
 
-    :param sender: Model class that was deleted
-    :param instance: The actual instance that was removed
-    """
+    observer = models.ForeignKey(Observer, related_name='items', on_delete=models.CASCADE)
+    primary_key = models.CharField(max_length=200)
+    order = models.IntegerField()
+    data = JSONField()
 
-    def notify():
-        table = sender._meta.db_table
-        observer_client.notify_table_remove(table)
+    class Meta:
+        unique_together = (
+            ('observer', 'order'),
+            ('observer', 'primary_key'),
+        )
+        ordering = ('observer', 'order')
 
-    transaction.on_commit(notify)
+    def __str__(self):
+        return 'primary_key={primary_key} order={order} data={data}'.format(
+            primary_key=self.primary_key,
+            order=self.order,
+            data=repr(self.data),
+        )
 
 
-@dispatch.receiver(model_signals.m2m_changed)
-def model_m2m_changed(sender, instance, action, **kwargs):
-    """
-    Signal emitted after any M2M relation changes via Django ORM.
+class Dependency(models.Model):
+    """Observer's dependency."""
 
-    :param sender: M2M intermediate model
-    :param instance: The actual instance that was saved
-    :param action: M2M action
-    """
+    observer = models.ForeignKey(Observer, related_name='dependencies', on_delete=models.CASCADE)
+    table = models.CharField(max_length=100)
 
-    def notify():
-        table = sender._meta.db_table
-        if action == 'post_add':
-            observer_client.notify_table_insert(table)
-        elif action in ('post_remove', 'post_clear'):
-            observer_client.notify_table_remove(table)
+    class Meta:
+        unique_together = ('observer', 'table')
 
-    transaction.on_commit(notify)
+    def __str__(self):
+        return 'table={table}'.format(table=self.table)
+
+
+class Subscriber(models.Model):
+    """Subscriber to an observer."""
+
+    session_id = models.CharField(primary_key=True, max_length=100)
+    created = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return 'session_id={session_id}'.format(session_id=self.session_id)

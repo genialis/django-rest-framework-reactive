@@ -1,15 +1,16 @@
-"""
-The views defined here are only used during testing.
-"""
-from __future__ import absolute_import, division, print_function, unicode_literals
+"""The views defined here are only used during testing."""
+import time
 
 from rest_framework import mixins, viewsets
 from rest_framework.pagination import LimitOffsetPagination
 from rest_framework.response import Response
 
+from rest_framework_reactive.decorators import observable, polling_observable
+
 from . import models, serializers
 
 
+@observable
 class ExampleItemViewSet(mixins.RetrieveModelMixin,
                          mixins.ListModelMixin,
                          viewsets.GenericViewSet):
@@ -19,6 +20,7 @@ class ExampleItemViewSet(mixins.RetrieveModelMixin,
     filter_fields = ('name', 'enabled', 'items')
 
 
+@observable
 class ExampleSubItemViewSet(mixins.RetrieveModelMixin,
                             mixins.ListModelMixin,
                             viewsets.GenericViewSet):
@@ -28,6 +30,7 @@ class ExampleSubItemViewSet(mixins.RetrieveModelMixin,
     filter_fields = ('parent__enabled', 'enabled')
 
 
+@observable
 class PaginatedViewSet(mixins.RetrieveModelMixin,
                        mixins.ListModelMixin,
                        viewsets.GenericViewSet):
@@ -37,6 +40,7 @@ class PaginatedViewSet(mixins.RetrieveModelMixin,
     pagination_class = LimitOffsetPagination
 
 
+@observable
 class AggregationTestViewSet(mixins.RetrieveModelMixin,
                              mixins.ListModelMixin,
                              viewsets.GenericViewSet):
@@ -55,3 +59,16 @@ class AggregationTestViewSet(mixins.RetrieveModelMixin,
         return Response({
             'count': queryset.count(),
         })
+
+
+class PollingObservableViewSet(mixins.RetrieveModelMixin,
+                               mixins.ListModelMixin,
+                               viewsets.GenericViewSet):
+
+    queryset = models.ExampleItem.objects.none()
+    serializer_class = serializers.ExampleItemSerializer
+
+    @observable
+    @polling_observable(5)
+    def list(self, request, *args, **kwargs):
+        return Response({'static': 'This is a polling observable: {}'.format(time.time())})

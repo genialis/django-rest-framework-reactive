@@ -40,17 +40,11 @@ setup(
     license=about['__license__'],
 
     packages=find_packages(exclude=['tests']),
+    python_requires='>=3.6',
     install_requires=[
         'Django~=1.11.6',
         'djangorestframework>=3.4.0',
-        'psycopg2>=2.5.0',
-        'gevent>=1.0.2',
-        'psycogreen>=1.0',
-        'django-db-geventpool>=1.20.1',
-        'redis~=2.10.6',
-        'requests>=2.8.1',
-        'django-redis>=4.3.0',
-        'channels~=1.1.6',
+        'channels~=2.1.1',
     ],
     extras_require={
         'docs': [
@@ -65,10 +59,14 @@ setup(
             'djangorestframework-filters>=0.9.1',
             'django-guardian>=1.4.2',
             'django-jenkins>=0.17.0',
-            'asgi-redis~=1.4.3',
+            'channels-redis~=2.1.0',
             'coverage>=3.7.1',
             'pep8>=1.6.2',
             'pylint>=1.4.3',
+            'pytest~=3.5.1',
+            'pytest-django~=3.2.1',
+            'pytest-asyncio~=0.8.0',
+            'psycopg2>=2.5.0',
             'check-manifest',
             'readme',
         ],
@@ -91,11 +89,8 @@ setup(
         'Operating System :: OS Independent',
 
         'Programming Language :: Python',
-        'Programming Language :: Python :: 2',
-        'Programming Language :: Python :: 2.7',
         'Programming Language :: Python :: 3',
-        'Programming Language :: Python :: 3.4',
-        'Programming Language :: Python :: 3.5',
+        'Programming Language :: Python :: 3.6',
     ],
 
     keywords='django-rest-framework reactive django',
