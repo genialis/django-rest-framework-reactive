@@ -4,9 +4,9 @@ Change Log
 
 All notable changes to this project are documented in this file.
 
-==========
-Unreleased
-==========
+================
+3.0.0 2018-05-15
+================
 
 Changed
 -------
