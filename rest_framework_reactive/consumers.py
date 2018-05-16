@@ -14,10 +14,8 @@ class PollObserversConsumer(AsyncConsumer):
 
     async def poll_observer(self, message):
         """Poll observer after a delay."""
-        print('poll observer rq', message)
         # Sleep until we need to notify the observer.
         await asyncio.sleep(message['interval'])
-        print('sleep done, sending notify')
 
         # Dispatch task to evaluate the observable.
         await self.send({
@@ -53,8 +51,13 @@ class WorkerConsumer(SyncConsumer):
 
     def orm_notify_table(self, message):
         """Process notification from ORM."""
-        # Find all observers with dependencies on the given table.
-        observers = Observer.objects.filter(dependencies__table=message['table']).distinct()
+        # Find all observers with dependencies on the given table. Instantiate it immediately
+        # to prevent us holding any locks on the table.
+        observers = list(
+            Observer.objects.filter(dependencies__table=message['table'])
+                .distinct()
+                .only('pk', 'request')
+        )
 
         for state in observers:
             self._evaluate(state)
@@ -76,6 +79,9 @@ class ClientConsumer(JsonWebsocketConsumer):
         """Called when WebSocket connection is established."""
         self.session_id = self.scope['url_route']['kwargs']['subscriber_id']
         super().websocket_connect(message)
+
+        # Create new subscriber object.
+        Subscriber.objects.create(session_id=self.session_id)
 
     @property
     def groups(self):

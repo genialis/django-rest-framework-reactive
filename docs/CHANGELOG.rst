@@ -4,6 +4,15 @@ Change Log
 
 All notable changes to this project are documented in this file.
 
+==========
+Unreleased
+==========
+
+Fixed
+-----
+* Fix issues with handling observer subscribers
+
+
 ================
 3.0.0 2018-05-15
 ================

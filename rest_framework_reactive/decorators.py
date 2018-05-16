@@ -2,6 +2,8 @@ import inspect
 
 from rest_framework import response, viewsets
 
+from django.db import transaction
+
 from . import observer, request as observer_request
 
 
@@ -40,8 +42,9 @@ def observable(method_or_viewset):
 
             # Create and evaluate observer.
             instance = observer.QueryObserver(request)
-            data = instance.evaluate()
-            observer.add_subscriber(session_id, instance.id)
+            with transaction.atomic():
+                data = instance.evaluate()
+                observer.add_subscriber(session_id, instance.id)
 
             return response.Response({
                 'observer': instance.id,

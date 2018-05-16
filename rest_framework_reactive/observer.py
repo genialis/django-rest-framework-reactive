@@ -8,7 +8,7 @@ import time
 import six
 
 from django.core import exceptions as django_exceptions
-from django.db import transaction
+from django.db import transaction, IntegrityError
 from django.http import Http404
 from django.utils import timezone
 
@@ -353,10 +353,15 @@ def add_subscriber(session_id, observer_id):
     :param session_id: Subscriber's session identifier
     :param observer_id: Observer identifier
     """
-    observer = models.Observer.objects.get(pk=observer_id)
-    observer.subscribers.add(
-        models.Subscriber.objects.get_or_create(session_id=session_id)[0]
-    )
+    with transaction.atomic():
+        try:
+            subscriber = models.Subscriber.objects.get(session_id=session_id)
+        except models.Subscriber.DoesNotExist:
+            # Subscriber does not exist as it may have already disconnected.
+            return
+
+        observer = models.Observer.objects.get(pk=observer_id)
+        observer.subscribers.add(subscriber)
 
 
 def remove_subscriber(session_id, observer_id):
@@ -365,5 +370,12 @@ def remove_subscriber(session_id, observer_id):
     :param session_id: Subscriber's session identifier
     :param observer_id: Observer identifier
     """
-    observer = models.Observer.objects.get(pk=observer_id)
-    observer.subscribers.filter(session_id=session_id).delete()
+    with transaction.atomic():
+        try:
+            subscriber = models.Subscriber.objects.get(session_id=session_id)
+        except models.Subscriber.DoesNotExist:
+            # Subscriber does not exist as it may have already disconnected.
+            return
+
+        observer = models.Observer.objects.get(pk=observer_id)
+        observer.subscribers.remove(subscriber)
