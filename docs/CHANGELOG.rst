@@ -4,6 +4,15 @@ Change Log
 
 All notable changes to this project are documented in this file.
 
+==========
+Unreleased
+==========
+
+Fixed
+-----
+* Ignore own ORM updates when processing observers
+
+
 ================
 3.0.1 2018-05-16
 ================

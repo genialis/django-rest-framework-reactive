@@ -9,6 +9,23 @@ from channels.layers import get_channel_layer
 from .models import Observer, Subscriber
 from .protocol import *
 
+# Global 'in migrations' flag to skip certain operations during migrations.
+IN_MIGRATIONS = False
+
+
+@dispatch.receiver(model_signals.pre_migrate)
+def model_pre_migrate(*args, **kwargs):
+    """Set 'in migrations' flag."""
+    global IN_MIGRATIONS
+    IN_MIGRATIONS = True
+
+
+@dispatch.receiver(model_signals.post_migrate)
+def model_post_migrate(*args, **kwargs):
+    """Clear 'in migrations' flag."""
+    global IN_MIGRATIONS
+    IN_MIGRATIONS = False
+
 
 def notify_observers(table, kind, primary_key=None):
     """Transmit ORM table change notifcation.
@@ -17,6 +34,13 @@ def notify_observers(table, kind, primary_key=None):
     :param kind: Change type
     :param primary_key: Primary key of the affected instance
     """
+
+    if IN_MIGRATIONS:
+        return
+
+    # Don't propagate events when there are no observers to receive them.
+    if not Observer.objects.filter(dependencies__table=table).exists():
+        return
 
     try:
         async_to_sync(get_channel_layer().send)(
@@ -41,6 +65,10 @@ def model_post_save(sender, instance, created=False, **kwargs):
     :param created: True if a new row was created
     """
 
+    if sender._meta.app_label == 'rest_framework_reactive':
+        # Ignore own events.
+        return
+
     def notify():
         table = sender._meta.db_table
         if created:
@@ -59,6 +87,10 @@ def model_post_delete(sender, instance, **kwargs):
     :param instance: The actual instance that was removed
     """
 
+    if sender._meta.app_label == 'rest_framework_reactive':
+        # Ignore own events.
+        return
+
     def notify():
         table = sender._meta.db_table
         notify_observers(table, ORM_NOTIFY_KIND_DELETE, instance.pk)
@@ -75,6 +107,10 @@ def model_m2m_changed(sender, instance, action, **kwargs):
     :param instance: The actual instance that was saved
     :param action: M2M action
     """
+
+    if sender._meta.app_label == 'rest_framework_reactive':
+        # Ignore own events.
+        return
 
     def notify():
         table = sender._meta.db_table
