@@ -247,3 +247,18 @@ class QueryObserversTestCase(test.TestCase):
         self.assertEquals(changed[0]['data'], {'id': item.pk, 'name': item.name, 'enabled': item.enabled})
         self.assertEquals(changed[0]['order'], 2)
         self.assertEquals(len(removed), 0)
+
+        # Check order change between two existing items.
+
+        item.name = 'B'
+        item.save()
+
+        added, changed, removed = observer.evaluate(return_emitted=True)
+
+        self.assertEquals(len(added), 0)
+        self.assertEquals(len(changed), 2)
+        self.assertEquals(changed[0]['data'], {'id': item.pk, 'name': item.name, 'enabled': item.enabled})
+        self.assertEquals(changed[0]['order'], 1)
+        self.assertEquals(changed[1]['data'], {'id': item3.pk, 'name': item3.name, 'enabled': item3.enabled})
+        self.assertEquals(changed[1]['order'], 2)
+        self.assertEquals(len(removed), 0)
