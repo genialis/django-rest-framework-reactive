@@ -3,6 +3,9 @@ import threading
 
 from django.db.models.sql import compiler
 
+# Global interceptor lock.
+INTERCEPTOR_LOCK = threading.Lock()
+
 
 class QueryInterceptor(object):
     """Django ORM query interceptor."""
@@ -10,25 +13,32 @@ class QueryInterceptor(object):
     def __init__(self):
         self.intercepting_queries = 0
         self.tables = set()
+        self.thread = threading.current_thread()
 
     def _patch(self):
         """Monkey patch the SQLCompiler class to get all the referenced tables in a code block."""
+        assert threading.current_thread() == self.thread
+
         self.intercepting_queries += 1
         if self.intercepting_queries > 1:
             return
 
-        self._original_as_sql = compiler.SQLCompiler.as_sql
+        with INTERCEPTOR_LOCK:
+            self._original_as_sql = compiler.SQLCompiler.as_sql
 
-        def as_sql(compiler, *args, **kwargs):
-            try:
-                return self._original_as_sql(compiler, *args, **kwargs)
-            finally:
-                self.tables.update(compiler.query.tables)
+            def as_sql(compiler, *args, **kwargs):
+                result = self._original_as_sql(compiler, *args, **kwargs)
+                if threading.current_thread() != self.thread:
+                    return result
 
-        compiler.SQLCompiler.as_sql = as_sql
+                self.tables.update([table for table in compiler.query.tables if table != table.upper()])
+                return result
+
+            compiler.SQLCompiler.as_sql = as_sql
 
     def _unpatch(self):
         """Restore SQLCompiler monkey patches."""
+        assert threading.current_thread() == self.thread
 
         self.intercepting_queries -= 1
         assert self.intercepting_queries >= 0
@@ -36,7 +46,8 @@ class QueryInterceptor(object):
         if self.intercepting_queries:
             return
 
-        compiler.SQLCompiler.as_sql = self._original_as_sql
+        with INTERCEPTOR_LOCK:
+            compiler.SQLCompiler.as_sql = self._original_as_sql
 
     @contextlib.contextmanager
     def intercept(self, tables):

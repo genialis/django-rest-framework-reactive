@@ -56,9 +56,11 @@ class WorkerConsumer(SyncConsumer):
     def orm_notify_table(self, message):
         """Process notification from ORM."""
         # Find all observers with dependencies on the given table and notify them.
-        observers = Observer.objects.filter(
-            dependencies__table=message['table']
-        ).distinct().values_list('pk', flat=True)
+        observers = list(
+            Observer.objects.filter(
+                dependencies__table=message['table']
+            ).distinct('pk').values_list('pk', flat=True)
+        )
 
         for observer in observers:
             async_to_sync(self.channel_layer.send)(
@@ -88,7 +90,7 @@ class ClientConsumer(JsonWebsocketConsumer):
         super().websocket_connect(message)
 
         # Create new subscriber object.
-        Subscriber.objects.create(session_id=self.session_id)
+        Subscriber.objects.get_or_create(session_id=self.session_id)
 
     @property
     def groups(self):

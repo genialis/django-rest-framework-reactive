@@ -13,6 +13,7 @@ Fixed
 * Defer ordering unique constraints when updating items
 * Dispatch observer evaluations to other workers instead of processing
   everything in the same worker
+* Fix issues with query interceptor in multiple threads
 
 
 ================

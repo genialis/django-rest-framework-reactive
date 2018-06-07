@@ -225,6 +225,16 @@ class QueryObserver(object):
                     observer=observer,
                     table=table,
                 )
+
+            # If there are no dependencies, this observer should be stopped.
+            if not tables:
+                logger.warning(
+                    "Stopping push-based observer without dependencies ({})".format(self._get_logging_id()),
+                    extra=self._get_logging_extra()
+                )
+
+                observer.delete()
+                return []
         elif self._meta.change_detection == Options.CHANGE_DETECTION_POLL:
             # Register poller.
             observer.poll_interval = self._meta.poll_interval
@@ -360,12 +370,11 @@ def add_subscriber(session_id, observer_id):
     """
     with transaction.atomic():
         try:
-            subscriber = models.Subscriber.objects.get(session_id=session_id)
-        except models.Subscriber.DoesNotExist:
-            # Subscriber does not exist as it may have already disconnected.
+            observer = models.Observer.objects.get(pk=observer_id)
+        except models.Observer.DoesNotExist:
             return
 
-        observer = models.Observer.objects.get(pk=observer_id)
+        subscriber, _ = models.Subscriber.objects.get_or_create(session_id=session_id)
         observer.subscribers.add(subscriber)
 
 
@@ -377,10 +386,8 @@ def remove_subscriber(session_id, observer_id):
     """
     with transaction.atomic():
         try:
-            subscriber = models.Subscriber.objects.get(session_id=session_id)
-        except models.Subscriber.DoesNotExist:
-            # Subscriber does not exist as it may have already disconnected.
+            observer = models.Observer.objects.get(pk=observer_id)
+        except models.Observer.DoesNotExist:
             return
 
-        observer = models.Observer.objects.get(pk=observer_id)
-        observer.subscribers.remove(subscriber)
+        observer.subscribers.filter(session_id=session_id).delete()
