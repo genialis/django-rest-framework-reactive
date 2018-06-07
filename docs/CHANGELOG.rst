@@ -14,6 +14,8 @@ Fixed
 * Dispatch observer evaluations to other workers instead of processing
   everything in the same worker
 * Fix issues with query interceptor in multiple threads
+* Cast primary keys in ORM signals to string to avoid JSON serialization
+  failures
 
 
 ================

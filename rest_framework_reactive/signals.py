@@ -49,7 +49,7 @@ def notify_observers(table, kind, primary_key=None):
                 'type': TYPE_ORM_NOTIFY_TABLE,
                 'table': table,
                 'kind': kind,
-                'primary_key': primary_key,
+                'primary_key': str(primary_key),
             }
         )
     except ChannelFull:

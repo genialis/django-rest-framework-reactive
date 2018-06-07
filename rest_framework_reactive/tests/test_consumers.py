@@ -74,7 +74,7 @@ async def test_worker_and_client():
     notify = await channel_layer.receive(CHANNEL_WORKER_NOTIFY)
     assert notify['type'] == TYPE_ORM_NOTIFY_TABLE
     assert notify['kind'] == ORM_NOTIFY_KIND_CREATE
-    assert notify['primary_key'] == primary_key
+    assert notify['primary_key'] == str(primary_key)
 
     # Propagate notification to worker.
     await worker.send_input(notify)
