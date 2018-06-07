@@ -257,8 +257,8 @@ class QueryObserversTestCase(test.TestCase):
 
         self.assertEquals(len(added), 0)
         self.assertEquals(len(changed), 2)
-        self.assertEquals(changed[0]['data'], {'id': item.pk, 'name': item.name, 'enabled': item.enabled})
-        self.assertEquals(changed[0]['order'], 1)
-        self.assertEquals(changed[1]['data'], {'id': item3.pk, 'name': item3.name, 'enabled': item3.enabled})
-        self.assertEquals(changed[1]['order'], 2)
+        self.assertEquals(changed[0]['data'], {'id': item3.pk, 'name': item3.name, 'enabled': item3.enabled})
+        self.assertEquals(changed[0]['order'], 2)
+        self.assertEquals(changed[1]['data'], {'id': item.pk, 'name': item.name, 'enabled': item.enabled})
+        self.assertEquals(changed[1]['order'], 1)
         self.assertEquals(len(removed), 0)

@@ -66,6 +66,7 @@ setup(
             'pytest~=3.5.1',
             'pytest-django~=3.2.1',
             'pytest-asyncio~=0.8.0',
+            'async_timeout>=2.0,<4.0',
             'psycopg2>=2.5.0',
             'check-manifest',
             'readme',

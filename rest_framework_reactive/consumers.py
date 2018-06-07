@@ -1,12 +1,13 @@
 import asyncio
 import pickle
 
+from asgiref.sync import async_to_sync
 from channels.consumer import AsyncConsumer, SyncConsumer
 from channels.generic.websocket import JsonWebsocketConsumer
 
 from .models import Observer, Subscriber
 from .observer import QueryObserver
-from .protocol import GROUP_SESSIONS, TYPE_POLL_OBSERVER
+from .protocol import *
 
 
 class PollObserversConsumer(AsyncConsumer):
@@ -18,10 +19,13 @@ class PollObserversConsumer(AsyncConsumer):
         await asyncio.sleep(message['interval'])
 
         # Dispatch task to evaluate the observable.
-        await self.send({
-            'type': TYPE_POLL_OBSERVER,
-            'observer': message['observer'],
-        })
+        await self.channel_layer.send(
+            CHANNEL_WORKER_NOTIFY,
+            {
+                'type': TYPE_EVALUATE_OBSERVER,
+                'observer': message['observer'],
+            }
+        )
 
 
 class WorkerConsumer(SyncConsumer):
@@ -51,21 +55,24 @@ class WorkerConsumer(SyncConsumer):
 
     def orm_notify_table(self, message):
         """Process notification from ORM."""
-        # Find all observers with dependencies on the given table. Instantiate it immediately
-        # to prevent us holding any locks on the table.
-        observers = list(
-            Observer.objects.filter(dependencies__table=message['table'])
-                .distinct()
-                .only('pk', 'request')
-        )
+        # Find all observers with dependencies on the given table and notify them.
+        observers = Observer.objects.filter(
+            dependencies__table=message['table']
+        ).distinct().values_list('pk', flat=True)
 
-        for state in observers:
-            self._evaluate(state)
+        for observer in observers:
+            async_to_sync(self.channel_layer.send)(
+                CHANNEL_WORKER_NOTIFY,
+                {
+                    'type': TYPE_EVALUATE_OBSERVER,
+                    'observer': observer,
+                }
+            )
 
-    def poll_observer(self, message):
-        """Evaluate poll observer."""
+    def observer_evaluate(self, message):
+        """Evaluate observer."""
         try:
-            observer = Observer.objects.get(pk=message['observer'])
+            observer = Observer.objects.only('pk', 'request').get(pk=message['observer'])
         except Observer.DoesNotExist:
             return
 

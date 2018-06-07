@@ -1,3 +1,6 @@
+from concurrent.futures import CancelledError
+
+import async_timeout
 import pytest
 
 from django.conf.urls import url
@@ -54,8 +57,9 @@ async def test_worker_and_client():
         assert not items
 
         add_subscriber('test-session', observer.id)
+        return observer.id
 
-    await create_observer()
+    observer_id = await create_observer()
 
     # Create a single model instance for the observer model.
     @database_sync_to_async
@@ -64,12 +68,24 @@ async def test_worker_and_client():
 
     primary_key = await create_model()
 
-    await worker.send_input({
-        'type': TYPE_ORM_NOTIFY_TABLE,
-        'table': models.ExampleItem._meta.db_table,
-        'kind': ORM_NOTIFY_KIND_CREATE,
-        'primary_key': primary_key,
-    })
+    # Check that ORM signal was generated.
+    channel_layer = get_channel_layer()
+
+    notify = await channel_layer.receive(CHANNEL_WORKER_NOTIFY)
+    assert notify['type'] == TYPE_ORM_NOTIFY_TABLE
+    assert notify['kind'] == ORM_NOTIFY_KIND_CREATE
+    assert notify['primary_key'] == primary_key
+
+    # Propagate notification to worker.
+    await worker.send_input(notify)
+
+    # Check that observer evaluation was requested.
+    notify = await channel_layer.receive(CHANNEL_WORKER_NOTIFY)
+    assert notify['type'] == TYPE_EVALUATE_OBSERVER
+    assert notify['observer'] == observer_id
+
+    # Propagate notification to worker.
+    await worker.send_input(notify)
 
     response = await client.receive_json_from()
     assert response['msg'] == 'added'
@@ -104,11 +120,19 @@ async def test_poll_observer():
         'interval': 5,
     })
 
+    channel_layer = get_channel_layer()
+
     # Nothing should be received in the frist 4 seconds.
-    await poller.receive_nothing(timeout=4)
+    async with async_timeout.timeout(4):
+        try:
+            await channel_layer.receive(CHANNEL_WORKER_NOTIFY)
+            assert False
+        except CancelledError:
+            pass
+
     # Then after two more seconds we should get a notification.
-    notify = await poller.receive_output(timeout=2)
-    assert notify['type'] == TYPE_POLL_OBSERVER
+    notify = await channel_layer.receive(CHANNEL_WORKER_NOTIFY)
+    assert notify['type'] == TYPE_EVALUATE_OBSERVER
     assert notify['observer'] == 'test'
 
 
@@ -155,10 +179,17 @@ async def test_poll_observer_integration():
 
     # Dispatch notification to poller as our poller uses a dummy queue.
     await poller.send_input(notify)
+
     # Nothing should be received in the frist 4 seconds.
-    await poller.receive_nothing(timeout=4)
+    async with async_timeout.timeout(4):
+        try:
+            await channel_layer.receive(CHANNEL_WORKER_NOTIFY)
+            assert False
+        except CancelledError:
+            pass
+
     # Then after two more seconds we should get a notification.
-    notify = await poller.receive_output(timeout=2)
+    notify = await channel_layer.receive(CHANNEL_WORKER_NOTIFY)
 
     # Dispatch notification to worker.
     await worker.send_input(notify)
