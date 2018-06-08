@@ -10,7 +10,7 @@ from rest_framework import test as api_test, request as api_request
 from . import models, views
 from rest_framework_reactive import models as observer_models
 from rest_framework_reactive import request as observer_request
-from rest_framework_reactive.observer import QueryObserver
+from rest_framework_reactive.observer import add_subscriber, QueryObserver
 
 # Create test request factory.
 factory = api_test.APIRequestFactory()
@@ -30,6 +30,8 @@ class QueryObserversTestCase(test.TestCase):
     def test_paginated_viewset(self):
         observer = QueryObserver(self.request(views.PaginatedViewSet, offset=0, limit=10))
         items = observer.evaluate()
+
+        add_subscriber('test-session', observer.id)
 
         self.assertEquals(len(items), 0)
 
@@ -54,6 +56,8 @@ class QueryObserversTestCase(test.TestCase):
         observer = QueryObserver(self.request(views.ExampleItemViewSet))
         items = observer.evaluate()
 
+        add_subscriber('test-session', observer.id)
+
         # Ensure items can be serialized into JSON.
         json.dumps(items)
 
@@ -61,6 +65,8 @@ class QueryObserversTestCase(test.TestCase):
         # Create a request and an observer for it.
         observer = QueryObserver(self.request(views.ExampleItemViewSet))
         items = observer.evaluate()
+
+        add_subscriber('test-session', observer.id)
 
         self.assertEquals(observer.id, 'fdd1312a8082540528908c32f4a94cac55365ef7acadc8e5ae8d4795cd7b5fa6')
         self.assertEquals(len(items), 0)
@@ -123,6 +129,8 @@ class QueryObserversTestCase(test.TestCase):
         observer = QueryObserver(self.request(views.ExampleItemViewSet, enabled=True))
         items = observer.evaluate()
 
+        add_subscriber('test-session', observer.id)
+
         self.assertEquals(observer.id, '0c2544b340aeb1919180ee6898a8e117de76b4a09dcedff7d6d172f3caa677c2')
         self.assertEquals(len(items), 0)
 
@@ -166,6 +174,8 @@ class QueryObserversTestCase(test.TestCase):
         observer = QueryObserver(self.request(views.ExampleSubItemViewSet, parent__enabled=True))
         items = observer.evaluate()
 
+        add_subscriber('test-session', observer.id)
+
         self.assertEquals(observer.id, '009955bdb64c21f679a7dfa2f747d6025ffef3185e5e01805662ebe8ca89c1d3')
         self.assertEquals(len(items), 0)
 
@@ -188,6 +198,8 @@ class QueryObserversTestCase(test.TestCase):
         observer = QueryObserver(self.request(views.AggregationTestViewSet, items=[m2m_item.pk]))
         observer.evaluate()
 
+        add_subscriber('test-session', observer.id)
+
         # There should be a dependency on the intermediate table.
         observer_state = observer_models.Observer.objects.get(pk=observer.id)
         dependencies = observer_state.dependencies.all().values_list('table', flat=True)
@@ -196,6 +208,8 @@ class QueryObserversTestCase(test.TestCase):
     def test_order(self):
         observer = QueryObserver(self.request(views.ExampleItemViewSet, ordering='name'))
         items = observer.evaluate()
+
+        add_subscriber('test-session', observer.id)
 
         self.assertEquals(len(items), 0)
 
@@ -266,6 +280,8 @@ class QueryObserversTestCase(test.TestCase):
     def test_no_dependencies(self):
         observer = QueryObserver(self.request(views.NoDependenciesViewSet))
         items = observer.evaluate()
+
+        add_subscriber('test-session', observer.id)
 
         self.assertEquals(len(items), 1)
         self.assertEqual(items[0], {'id': 1, 'static': 'This has no dependencies'})

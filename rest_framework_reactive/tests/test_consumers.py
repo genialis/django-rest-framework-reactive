@@ -98,6 +98,10 @@ async def test_worker_and_client():
 
     await client.disconnect()
 
+    # Run observer again and it should remove itself because there are no more subscribers.
+    await worker.send_input({'type': TYPE_EVALUATE_OBSERVER, 'observer': observer_id})
+    assert await worker.receive_nothing() is True
+
     # Ensure that subscriber and observer have been removed.
     @database_sync_to_async
     def check_subscribers():

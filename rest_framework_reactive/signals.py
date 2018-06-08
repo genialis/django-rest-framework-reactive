@@ -120,14 +120,3 @@ def model_m2m_changed(sender, instance, action, **kwargs):
             notify_observers(table, ORM_NOTIFY_KIND_DELETE)
 
     transaction.on_commit(notify)
-
-
-@dispatch.receiver(model_signals.post_delete, sender=Subscriber)
-def subscriber_removed(sender, instance, **kwargs):
-    """Remove observer if all subscribers removed.
-
-    Ensure that when all subscribers are removed from an observer, the
-    observer itself is also removed.
-
-    """
-    Observer.objects.filter(subscribers=None).delete()

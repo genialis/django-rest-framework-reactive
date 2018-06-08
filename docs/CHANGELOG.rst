@@ -16,6 +16,7 @@ Added
 Fixed
 -----
 * Fix viewsets without dependencies returning no results
+* Fix issues with handling observer subscribers
 
 
 ================

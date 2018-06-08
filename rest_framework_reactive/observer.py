@@ -333,16 +333,20 @@ class QueryObserver(object):
                 'removed': removed,
             }
 
+            # Stop an observer if there are no subscribers and we are in OBSERVING state.
+            if not observer.subscribers.exists():
+                stop_observer = True
+
             for subscriber in observer.subscribers.all():
                 async_to_sync(get_channel_layer().group_send)(
                     GROUP_SESSIONS.format(session_id=subscriber.session_id),
                     message,
                 )
 
-            if stop_observer:
-                observer.delete()
-
             if return_emitted:
+                if stop_observer:
+                    observer.delete()
+
                 return (added, changed, removed)
         elif not stop_observer:
             # Switch observer status to OBSERVING.
@@ -390,10 +394,7 @@ def remove_subscriber(session_id, observer_id):
     :param session_id: Subscriber's session identifier
     :param observer_id: Observer identifier
     """
-    with transaction.atomic():
-        try:
-            observer = models.Observer.objects.get(pk=observer_id)
-        except models.Observer.DoesNotExist:
-            return
-
-        observer.subscribers.filter(session_id=session_id).delete()
+    models.Observer.subscribers.through.objects.filter(
+        subscriber_id=session_id,
+        observer_id=observer_id
+    ).delete()
