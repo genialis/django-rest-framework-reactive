@@ -230,11 +230,10 @@ class QueryObserver(object):
             if not tables:
                 logger.warning(
                     "Stopping push-based observer without dependencies ({})".format(self._get_logging_id()),
-                    extra=self._get_logging_extra()
+                    extra=self._get_logging_extra(stopped=True)
                 )
 
-                observer.delete()
-                return []
+                stop_observer = True
         elif self._meta.change_detection == Options.CHANGE_DETECTION_POLL:
             # Register poller.
             observer.poll_interval = self._meta.poll_interval
@@ -253,8 +252,9 @@ class QueryObserver(object):
             ))
 
         # Update last evaluation time.
-        observer.last_evaluation = timezone.now()
-        observer.save()
+        if not stop_observer:
+            observer.last_evaluation = timezone.now()
+            observer.save()
 
         # Log viewsets with too much output.
         max_result_length = get_queryobserver_settings()['warnings']['max_result_length']
@@ -339,12 +339,18 @@ class QueryObserver(object):
                     message,
                 )
 
+            if stop_observer:
+                observer.delete()
+
             if return_emitted:
                 return (added, changed, removed)
-        else:
+        elif not stop_observer:
             # Switch observer status to OBSERVING.
             observer.status = models.Observer.STATUS_OBSERVING
             observer.save()
+
+        if stop_observer:
+            observer.delete()
 
         if return_full:
             return [item['data'] for item in new_results.values()]

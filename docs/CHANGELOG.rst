@@ -4,6 +4,15 @@ Change Log
 
 All notable changes to this project are documented in this file.
 
+==========
+Unreleased
+==========
+
+Fixed
+-----
+* Fix viewsets without dependencies returning no results
+
+
 ================
 3.0.3 2018-06-08
 ================

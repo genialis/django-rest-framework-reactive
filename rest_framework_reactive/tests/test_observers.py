@@ -262,3 +262,14 @@ class QueryObserversTestCase(test.TestCase):
         self.assertEquals(changed[1]['data'], {'id': item.pk, 'name': item.name, 'enabled': item.enabled})
         self.assertEquals(changed[1]['order'], 1)
         self.assertEquals(len(removed), 0)
+
+    def test_no_dependencies(self):
+        observer = QueryObserver(self.request(views.NoDependenciesViewSet))
+        items = observer.evaluate()
+
+        self.assertEquals(len(items), 1)
+        self.assertEqual(items[0], {'id': 1, 'static': 'This has no dependencies'})
+
+        # Observer should have been removed because there are no dependencies.
+
+        self.assertFalse(observer_models.Observer.objects.exists())

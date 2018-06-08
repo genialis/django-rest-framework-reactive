@@ -72,3 +72,15 @@ class PollingObservableViewSet(mixins.RetrieveModelMixin,
     @polling_observable(5)
     def list(self, request, *args, **kwargs):
         return Response({'static': 'This is a polling observable: {}'.format(time.time())})
+
+
+class NoDependenciesViewSet(mixins.RetrieveModelMixin,
+                            mixins.ListModelMixin,
+                            viewsets.GenericViewSet):
+
+    queryset = models.ExampleItem.objects.none()
+    serializer_class = serializers.ExampleItemSerializer
+
+    @observable
+    def list(self, request, *args, **kwargs):
+        return Response({'static': 'This has no dependencies'})
