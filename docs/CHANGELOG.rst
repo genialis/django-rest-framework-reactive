@@ -8,6 +8,11 @@ All notable changes to this project are documented in this file.
 Unreleased
 ==========
 
+Added
+-----
+* Add ``clearobservers`` management command which clears all observer
+  state from the database.
+
 Fixed
 -----
 * Fix viewsets without dependencies returning no results
