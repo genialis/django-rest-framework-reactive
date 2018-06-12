@@ -4,6 +4,15 @@ Change Log
 
 All notable changes to this project are documented in this file.
 
+==========
+Unreleased
+==========
+
+Fixed
+-----
+* Rewrite query interceptor to properly handle multiple threads
+
+
 ================
 3.0.4 2018-06-08
 ================
