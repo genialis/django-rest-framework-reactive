@@ -4,6 +4,15 @@ Change Log
 
 All notable changes to this project are documented in this file.
 
+==========
+Unreleased
+==========
+
+Fixed
+-----
+* Fix IntegrityError on concurrent evaluations
+
+
 ================
 3.0.5 2018-06-12
 ================

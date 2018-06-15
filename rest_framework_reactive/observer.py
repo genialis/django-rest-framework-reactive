@@ -130,14 +130,12 @@ class QueryObserver(object):
             with transaction.atomic():
                 # Obtain the observer state and lock it. This prevents an observer from being
                 # processed in parallel from multiple different workers.
-                try:
-                    observer = models.Observer.objects.select_for_update().get(pk=self.id)
-                except models.Observer.DoesNotExist:
-                    # No observer yet, create one.
-                    observer = models.Observer.objects.create(
-                        id=self.id,
-                        request=pickle.dumps(self._request),
-                    )
+                observer, _ = models.Observer.objects.select_for_update().get_or_create(
+                    id=self.id,
+                    defaults={
+                        'request': pickle.dumps(self._request),
+                    },
+                )
 
                 # Evaluate the observer.
                 start = time.time()
