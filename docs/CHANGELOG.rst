@@ -4,6 +4,15 @@ Change Log
 
 All notable changes to this project are documented in this file.
 
+==========
+Unreleased
+==========
+
+Fixed
+-----
+* Do not generate notification messages when there are no updates
+
+
 ================
 3.0.6 2018-06-15
 ================

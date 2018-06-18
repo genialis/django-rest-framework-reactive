@@ -335,11 +335,13 @@ class QueryObserver(object):
             if not observer.subscribers.exists():
                 stop_observer = True
 
-            for subscriber in observer.subscribers.all():
-                async_to_sync(get_channel_layer().group_send)(
-                    GROUP_SESSIONS.format(session_id=subscriber.session_id),
-                    message,
-                )
+            # Only generate notifications in case there were any changes.
+            if added or changed or removed:
+                for subscriber in observer.subscribers.all():
+                    async_to_sync(get_channel_layer().group_send)(
+                        GROUP_SESSIONS.format(session_id=subscriber.session_id),
+                        message,
+                    )
 
             if return_emitted:
                 if stop_observer:
