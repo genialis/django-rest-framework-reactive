@@ -106,8 +106,6 @@ class ClientConsumer(JsonWebsocketConsumer):
 
     def observer_update(self, message):
         """Called when update from observer is received."""
-        message.pop('type')
-
         # Demultiplex observer update into multiple messages.
         for action in ('added', 'changed', 'removed'):
             for item in message[action]:

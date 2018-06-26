@@ -4,6 +4,15 @@ Change Log
 
 All notable changes to this project are documented in this file.
 
+==========
+Unreleased
+==========
+
+Fixed
+-----
+* Do not mutate received update message in client consumer
+
+
 ================
 3.0.7 2018-06-19
 ================
