@@ -11,6 +11,7 @@ Unreleased
 Fixed
 -----
 * Do not mutate received update message in client consumer
+* Use a bounded cache with LRU eviction policy for executors
 
 
 ================

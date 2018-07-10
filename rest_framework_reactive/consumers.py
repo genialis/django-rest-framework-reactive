@@ -1,4 +1,5 @@
 import asyncio
+import collections
 import pickle
 
 from asgiref.sync import async_to_sync
@@ -8,6 +9,9 @@ from channels.generic.websocket import JsonWebsocketConsumer
 from .models import Observer, Subscriber
 from .observer import QueryObserver
 from .protocol import *
+
+# Maximum number of cached observer executors.
+MAX_CACHED_EXECUTORS = 1024
 
 
 class PollObserversConsumer(AsyncConsumer):
@@ -33,17 +37,21 @@ class WorkerConsumer(SyncConsumer):
 
     def __init__(self, *args, **kwargs):
         """Construct observer worker consumer."""
-        self._executor_cache = {}
+        self._executor_cache = collections.OrderedDict()
         super().__init__(*args, **kwargs)
 
     def _get_executor(self, state):
         """Get executor for given observer's state."""
         try:
-            return self._executor_cache[state.pk]
+            executor = self._executor_cache[state.pk]
+            self._executor_cache.move_to_end(state.pk)
         except KeyError:
             executor = QueryObserver(pickle.loads(state.request))
             self._executor_cache[state.pk] = executor
-            return executor
+            if len(self._executor_cache) > MAX_CACHED_EXECUTORS:
+                self._executor_cache.popitem(last=False)
+
+        return executor
 
     def _evaluate(self, state):
         """Evaluate observer based on state."""
