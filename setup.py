@@ -56,7 +56,11 @@ setup(
             'wheel',
         ],
         'test': [
-            'djangorestframework-filters>=0.9.1',
+            'djangorestframework-filters~=0.10.0',
+            # XXX: djangorestframework-filters has too open requirement for
+            # django-filter and doesn't work with the latest version, so we
+            # have to pin it
+            'django-filter~=1.0.0',
             'django-guardian>=1.4.2',
             'django-jenkins>=0.17.0',
             'channels-redis~=2.1.0',
