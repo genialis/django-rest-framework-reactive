@@ -27,6 +27,8 @@ logger = logging.getLogger(__name__)  # pylint: disable=invalid-name
 
 # Observable method options attribute name prefix.
 OBSERVABLE_OPTIONS_PREFIX = 'observable_'
+# Maximum number of retries in case of concurrent observer creates.
+MAX_INTEGRITY_ERROR_RETRIES = 3
 
 
 class Options(object):
@@ -127,37 +129,49 @@ class QueryObserver(object):
         try:
             settings = get_queryobserver_settings()
 
-            with transaction.atomic():
-                # Obtain the observer state and lock it. This prevents an observer from being
-                # processed in parallel from multiple different workers.
-                observer, _ = models.Observer.objects.select_for_update().get_or_create(
-                    id=self.id,
-                    defaults={
-                        'request': pickle.dumps(self._request),
-                    },
-                )
+            for retry in range(MAX_INTEGRITY_ERROR_RETRIES):
+                try:
+                    with transaction.atomic():
+                        # Obtain the observer state and lock it. This prevents an observer from being
+                        # processed in parallel from multiple different workers.
+                        observer, _ = models.Observer.objects.select_for_update().get_or_create(
+                            id=self.id,
+                            defaults={
+                                'request': pickle.dumps(self._request),
+                            },
+                        )
 
-                # Evaluate the observer.
-                start = time.time()
-                result = self._evaluate(observer, return_full, return_emitted)
-                duration = time.time() - start
+                        # Evaluate the observer.
+                        start = time.time()
+                        result = self._evaluate(observer, return_full, return_emitted)
+                        duration = time.time() - start
 
-                # Log slow observers.
-                if duration > settings['warnings']['max_processing_time']:
-                    logger.warning(
-                        "Slow observed viewset ({})".format(self._get_logging_id()),
-                        extra=self._get_logging_extra(duration=duration)
-                    )
+                        # Log slow observers.
+                        if duration > settings['warnings']['max_processing_time']:
+                            logger.warning(
+                                "Slow observed viewset ({})".format(self._get_logging_id()),
+                                extra=self._get_logging_extra(duration=duration)
+                            )
 
-                # Stop really slow observers.
-                if duration > settings['errors']['max_processing_time']:
-                    logger.error(
-                        "Stopped extremely slow observed viewset ({})".format(self._get_logging_id()),
-                        extra=self._get_logging_extra(stopped=True, duration=duration)
-                    )
-                    observer.delete()
+                        # Stop really slow observers.
+                        if duration > settings['errors']['max_processing_time']:
+                            logger.error(
+                                "Stopped extremely slow observed viewset ({})".format(self._get_logging_id()),
+                                extra=self._get_logging_extra(stopped=True, duration=duration)
+                            )
+                            observer.delete()
 
-            return result
+                        return result
+                except IntegrityError:
+                    # If an IntegrityError occurrs we need to rollback the transaction and retry observer
+                    # evaluation as another transaction may be creating an observer concurrently.
+                    if retry == MAX_INTEGRITY_ERROR_RETRIES - 1:
+                        raise
+
+                    continue
+
+            # Should never be reached.
+            assert False
         except:  # pylint: disable=bare-except
             logger.exception(
                 "Error while evaluating observer ({})".format(self._get_logging_id()),

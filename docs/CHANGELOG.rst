@@ -4,6 +4,16 @@ Change Log
 
 All notable changes to this project are documented in this file.
 
+==========
+Unreleased
+==========
+
+Fixed
+-----
+* Retry taking the observer lock before evaluation on IntegrityError due
+  to concurrent observer creation
+
+
 ================
 3.0.8 2018-07-10
 ================
