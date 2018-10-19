@@ -1,3 +1,5 @@
+import logging
+
 from django import dispatch
 from django.db import transaction
 from django.db.models import signals as model_signals
@@ -9,6 +11,9 @@ from django_priority_batch import PrioritizedBatcher
 
 from .models import Observer, Subscriber
 from .protocol import *
+
+# Logger.
+logger = logging.getLogger(__name__)  # pylint: disable=invalid-name
 
 # Global 'in migrations' flag to skip certain operations during migrations.
 IN_MIGRATIONS = False
@@ -56,7 +61,7 @@ def notify_observers(table, kind, primary_key=None):
                 }
             )
         except ChannelFull:
-            pass
+            logger.exception("Unable to notify workers.")
 
     batcher = PrioritizedBatcher.global_instance()
     if batcher.is_started:
