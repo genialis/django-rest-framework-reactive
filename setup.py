@@ -63,6 +63,7 @@ setup(
             'django-filter~=1.0.0',
             'django-guardian>=1.4.2',
             'django-jenkins>=0.17.0',
+            'django-priority-batch>=1.0.0',
             'channels-redis~=2.1.0',
             'coverage>=3.7.1',
             'pep8>=1.6.2',

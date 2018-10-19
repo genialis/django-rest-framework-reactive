@@ -4,6 +4,15 @@ Change Log
 
 All notable changes to this project are documented in this file.
 
+==========
+Unreleased
+==========
+
+Added
+-----
+* Optionally batch observer notifications
+
+
 ================
 3.0.9 2018-09-07
 ================

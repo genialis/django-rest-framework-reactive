@@ -5,6 +5,7 @@ from django.db.models import signals as model_signals
 from asgiref.sync import async_to_sync
 from channels.exceptions import ChannelFull
 from channels.layers import get_channel_layer
+from django_priority_batch import PrioritizedBatcher
 
 from .models import Observer, Subscriber
 from .protocol import *
@@ -42,18 +43,28 @@ def notify_observers(table, kind, primary_key=None):
     if not Observer.objects.filter(dependencies__table=table).exists():
         return
 
-    try:
-        async_to_sync(get_channel_layer().send)(
-            CHANNEL_WORKER_NOTIFY,
-            {
-                'type': TYPE_ORM_NOTIFY_TABLE,
-                'table': table,
-                'kind': kind,
-                'primary_key': str(primary_key),
-            }
-        )
-    except ChannelFull:
-        pass
+    def handler():
+        """Send a notification to the given channel."""
+        try:
+            async_to_sync(get_channel_layer().send)(
+                CHANNEL_WORKER_NOTIFY,
+                {
+                    'type': TYPE_ORM_NOTIFY_TABLE,
+                    'table': table,
+                    'kind': kind,
+                    'primary_key': str(primary_key),
+                }
+            )
+        except ChannelFull:
+            pass
+
+    batcher = PrioritizedBatcher.global_instance()
+    if batcher.is_started:
+        # If a batch is open, queue the send via the batcher.
+        batcher.add('rest_framework_reactive', handler, group_by=(table, kind, primary_key))
+    else:
+        # If no batch is open, invoke immediately.
+        handler()
 
 
 @dispatch.receiver(model_signals.post_save)
