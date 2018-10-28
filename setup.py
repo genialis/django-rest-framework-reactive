@@ -47,6 +47,7 @@ setuptools.setup(
             'async_timeout>=2.0,<4.0',
             'psycopg2>=2.5.0',
             'check-manifest',
+            'twine',
         ],
     },
     classifiers=[

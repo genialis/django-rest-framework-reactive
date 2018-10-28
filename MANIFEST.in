@@ -1,0 +1,10 @@
+# Include meta data.
+include LICENSE
+# Include documentation and files needed by documentation.
+recursive-include docs *.py *.rst
+# Include tests and files needed by tests
+include tox.ini
+include pyproject.toml
+include tests/.env
+include tests/docker-compose.yml
+recursive-include tests *.py
