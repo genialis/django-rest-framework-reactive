@@ -21,7 +21,10 @@ setuptools.setup(
     author_email=about['__email__'],
     url=about['__url__'],
     license=about['__license__'],
-    packages=setuptools.find_packages(exclude=['tests']),
+    # Exclude tests from built/installed package.
+    packages=setuptools.find_packages(
+        exclude=['tests', 'tests.*', '*.tests', '*.tests.*']
+    ),
     python_requires='>=3.6, <3.7',
     install_requires=[
         'Django~=1.11.6',

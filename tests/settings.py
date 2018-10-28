@@ -21,7 +21,7 @@ MIDDLEWARE_CLASSES = (
 # Apps from this project
 PROJECT_APPS = (
     'rest_framework_reactive',
-    'rest_framework_reactive.tests.apps.QueryObserverTestsConfig',
+    'drfr_test_app.apps.QueryObserverTestsConfig',
 )
 
 INSTALLED_APPS = (

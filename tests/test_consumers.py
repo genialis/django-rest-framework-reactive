@@ -16,7 +16,7 @@ from rest_framework_reactive.consumers import ClientConsumer, PollObserversConsu
 from rest_framework_reactive.protocol import *
 from rest_framework_reactive.observer import QueryObserver, add_subscriber, remove_subscriber
 
-from . import models, views
+from drfr_test_app import models, views
 
 # Create test request factory.
 factory = api_test.APIRequestFactory()

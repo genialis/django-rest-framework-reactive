@@ -7,10 +7,11 @@ from django.contrib.auth import models as auth_models
 from guardian import shortcuts
 from rest_framework import test as api_test, request as api_request
 
-from . import models, views
 from rest_framework_reactive import models as observer_models
 from rest_framework_reactive import request as observer_request
 from rest_framework_reactive.observer import add_subscriber, QueryObserver
+
+from drfr_test_app import models, views
 
 # Create test request factory.
 factory = api_test.APIRequestFactory()
@@ -68,7 +69,7 @@ class QueryObserversTestCase(test.TestCase):
 
         add_subscriber('test-session', observer.id)
 
-        self.assertEquals(observer.id, 'fdd1312a8082540528908c32f4a94cac55365ef7acadc8e5ae8d4795cd7b5fa6')
+        self.assertEquals(observer.id, 'fa87c86f1e032942b699e9902ac38ca232ce3566724b3891914c80083b676ed4')
         self.assertEquals(len(items), 0)
 
         # Add an item into the database.
@@ -131,7 +132,7 @@ class QueryObserversTestCase(test.TestCase):
 
         add_subscriber('test-session', observer.id)
 
-        self.assertEquals(observer.id, '0c2544b340aeb1919180ee6898a8e117de76b4a09dcedff7d6d172f3caa677c2')
+        self.assertEquals(observer.id, '5333b85599fd24ed4e2f7eeaefb599cbbd39894b437e9b9d3b80d5d21639b4bb')
         self.assertEquals(len(items), 0)
 
         item = models.ExampleItem()
@@ -176,13 +177,13 @@ class QueryObserversTestCase(test.TestCase):
 
         add_subscriber('test-session', observer.id)
 
-        self.assertEquals(observer.id, '009955bdb64c21f679a7dfa2f747d6025ffef3185e5e01805662ebe8ca89c1d3')
+        self.assertEquals(observer.id, '92b1698976bf1e04d155f9c60ac74c054ef872f547a59d771fc3c046998bbba8')
         self.assertEquals(len(items), 0)
 
         observer_state = observer_models.Observer.objects.get(pk=observer.id)
         dependencies = observer_state.dependencies.all().values_list('table', flat=True)
-        self.assertIn('rest_framework_reactive_tests_exampleitem', dependencies)
-        self.assertIn('rest_framework_reactive_tests_examplesubitem', dependencies)
+        self.assertIn('drfr_test_app_exampleitem', dependencies)
+        self.assertIn('drfr_test_app_examplesubitem', dependencies)
 
     def test_aggregations(self):
         item = models.ExampleItem()
@@ -203,7 +204,7 @@ class QueryObserversTestCase(test.TestCase):
         # There should be a dependency on the intermediate table.
         observer_state = observer_models.Observer.objects.get(pk=observer.id)
         dependencies = observer_state.dependencies.all().values_list('table', flat=True)
-        self.assertIn('rest_framework_reactive_tests_examplem2mitem_items', dependencies)
+        self.assertIn('drfr_test_app_examplem2mitem_items', dependencies)
 
     def test_order(self):
         observer = QueryObserver(self.request(views.ExampleItemViewSet, ordering='name'))

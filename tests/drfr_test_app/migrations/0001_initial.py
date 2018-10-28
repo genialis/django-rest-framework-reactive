@@ -31,7 +31,7 @@ class Migration(migrations.Migration):
             fields=[
                 ('id', models.AutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
                 ('value', models.IntegerField(default=1)),
-                ('items', models.ManyToManyField(related_name='items', to='rest_framework_reactive_tests.ExampleItem')),
+                ('items', models.ManyToManyField(related_name='items', to='drfr_test_app.ExampleItem')),
             ],
             options={
                 'ordering': ['pk'],
@@ -42,7 +42,7 @@ class Migration(migrations.Migration):
             fields=[
                 ('id', models.AutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
                 ('enabled', models.BooleanField()),
-                ('parent', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, to='rest_framework_reactive_tests.ExampleItem')),
+                ('parent', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, to='drfr_test_app.ExampleItem')),
             ],
             options={
                 'ordering': ['pk'],
