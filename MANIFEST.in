@@ -1,3 +1,8 @@
+# Include setup.py.
+# NOTE: This is needed until setuptools is fixed to include setup.py file by
+# default for scenarios where the invoking script is not setup.py.
+# For more details, see: https://github.com/pypa/setuptools/issues/1506.
+include setup.py
 # Include meta data.
 include LICENSE
 # Include documentation and files needed by documentation.
