@@ -15,7 +15,7 @@ with open(
 
 setuptools.setup(
     name=about['__title__'],
-    version=about['__version__'],
+    use_scm_version=True,
     description=about['__summary__'],
     long_description=long_description,
     long_description_content_type='text/x-rst',
@@ -54,6 +54,7 @@ setuptools.setup(
             'psycopg2>=2.5.0',
             'check-manifest',
             'twine',
+            'setuptools_scm',
         ],
     },
     classifiers=[
