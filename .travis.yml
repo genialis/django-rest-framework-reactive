@@ -46,6 +46,11 @@ jobs:
     # NOTE: We undo almost all global Travis CI step definitions to ensure the
     # following Tox environments are run without access to any service.
     - stage: test
+      env: TOX_ENV=docs
+      services: []
+      addons: {}
+      before_install: skip
+    - stage: test
       env: TOX_ENV=packaging
       services: []
       addons: {}
