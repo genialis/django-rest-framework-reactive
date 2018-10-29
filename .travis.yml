@@ -1,31 +1,47 @@
-sudo: required
+# Global Travis CI step definitions that will be used by all jobs unless
+# explicitly overriden in the jobs.include matrix.
 
-# NOTE: It is necessary to explicitly set the distribution to "trusty" due to
-# the complex 'matrix: include:' logic below
-# More information: https://github.com/travis-ci/travis-ci/issues/5448
-dist: trusty
-
-addons:
-  postgresql: "9.4"
+language: python
+python: "3.6"
 
 services:
   - postgresql
   - redis-server
 
-language: python
-
-env:
-  global:
-    - DRFR_POSTGRESQL_USER=postgres
-    - DRFR_POSTGRESQL_PORT=5432
-    - DRFR_REDIS_PORT=6379
-
-# NOTE: Explicit Python versions make Travis job description more informative
-matrix:
-  include:
-    - env: TOX_ENV=py36
-      python: "3.6"
+addons:
+  postgresql: "9.4"
 
 install: pip install tox
 
 script: tox -e $TOX_ENV
+
+# Build stages.
+jobs:
+  include:
+    - stage: test
+      env:
+        - TOX_ENV=py36
+        # Set environment variables with information how to use the required
+        # services.
+        - DRFR_POSTGRESQL_USER=postgres
+        - DRFR_POSTGRESQL_PORT=5432
+        - DRFR_REDIS_PORT=6379
+
+    # NOTE: We undo almost all global Travis CI step definitions to ensure the
+    # following Tox environments are run without access to any service.
+    - stage: test
+      env: TOX_ENV=packaging
+      services: []
+      addons: {}
+
+    # NOTE: We undo many global Travis CI step definitions to ensure the
+    # following Tox environment only has access to the PostgreSQL service.
+    - stage: test
+      env:
+        - TOX_ENV=migrations
+        # Set environment variables with information how to use the PostgreSQL
+        # service.
+        - DRFR_POSTGRESQL_USER=postgres
+        - DRFR_POSTGRESQL_PORT=5432
+      services:
+        - postgresql
