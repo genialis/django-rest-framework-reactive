@@ -2,7 +2,7 @@
 # Development configuration of dependent services for Docker Compose.
 #
 postgresql:
-    image: postgres:9.4
+    image: postgres:10
     environment:
         POSTGRES_USER: drfr
         POSTGRES_DB: drfr

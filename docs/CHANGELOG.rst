@@ -4,6 +4,16 @@ Change Log
 
 All notable changes to this project are documented in this file.
 
+
+==========
+Unreleased
+==========
+
+Changed
+-------
+* Support PostgreSQL 10
+
+
 ================
 3.1.0 2018-10-19
 ================
