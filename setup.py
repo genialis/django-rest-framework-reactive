@@ -55,6 +55,7 @@ setuptools.setup(
             'check-manifest',
             'twine',
             'setuptools_scm',
+            'black',
         ],
     },
     classifiers=[

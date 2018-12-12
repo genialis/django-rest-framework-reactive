@@ -51,6 +51,11 @@ jobs:
       addons: {}
       before_install: skip
     - stage: test
+      env: TOX_ENV=linters
+      services: []
+      addons: {}
+      before_install: skip
+    - stage: test
       env: TOX_ENV=packaging
       services: []
       addons: {}
