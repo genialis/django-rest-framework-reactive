@@ -67,3 +67,27 @@ jobs:
         - DRFR_POSTGRESQL_PORT=5432
       services:
         - postgresql
+
+    # NOTE: We undo/change all the global Travis CI step definitions to ensure
+    # building of source and wheel distributions is performed in a clean
+    # environment.
+    - stage: release
+      services: []
+      addons: {}
+      before_install: skip
+      # Project uses setuptools_scm to determine the version from a SCM tag.
+      install: pip install setuptools_scm
+      script: skip
+      deploy:
+        provider: pypi
+        user: genialis-bot
+        password:
+          secure: "XsDBS7iX1m0dX8Obo33Y7iumPGDXXuaaB0NUlhrvpbBONc48YMhEQDnQtFTtfl8iMZpiP5XRrKxCahJ8Ge0DvtCw7P0OSEMnMm/ig6TggArY249dsHR6aOP5IQxyUeI/RftXWnTc0TszMdVzMYZx5gHtLpeK1h8DK4bapOahaIDYN0nx/b2zTLc+l+UzFrhmtpI9zHkX8yvWrjBQSWamko3ZNVKRdRzw1tIKP/7q3GugXBgIJzUDScVSQs7vYmbq3fVnm6e0vHf7xx4YUR7h6iPosjzXr28ChaNiSttWHKUUPqvE3HsImMMVE5PH1Vmz/f0Kgnq13D5RlD96MQ4lim8/sEvNJ+ww+K9TtdA6xP7y0vC36/pgoZndZ1PAuORE/usIfTXIM25HWlkx5ojTFMFB+reCb6qR3rOyxo0AF6UVpJZhhcMuK8/swtyz4MULpuAtf71ErpMAb2XUIqay8c2xnyPV9qWZqVcT4CpNJMQwo6Ec1l6Q8t54+Ewe7UIi/wCXDUmux+atI+dIFY+zR6XrHnOCHfnTjJ8HMG09WYNZ6rPDrAIjk1ZjRmJthnWL7EMRZopm3r+onFw/4r/gyTzr7qtKgl6g7uE/tBr7BueRcG2oImVTGhU8QZ6R5POk7Xas3Kv47rePZC0N6F3JIk3AAf8nbcRYMD63w05slok="
+        distributions: sdist bdist_wheel
+        on:
+          # Enable deploying tags. By default, Travis CI only deploys from the
+          # master branch.
+          tags: true
+      # Only build releases for tags starting with a Semantic Versioning 2.0
+      # compatible version.
+      if: tag =~ ^\d+\.\d+\.\d+
