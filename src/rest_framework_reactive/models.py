@@ -1,6 +1,7 @@
 from django.contrib.postgres.fields import JSONField
 from django.db import models, transaction
 
+
 class Observer(models.Model):
     """State for an observer."""
 
@@ -29,30 +30,29 @@ class Observer(models.Model):
 class Item(models.Model):
     """Item part of the observer's result set."""
 
-    observer = models.ForeignKey(Observer, related_name='items', on_delete=models.CASCADE)
+    observer = models.ForeignKey(
+        Observer, related_name='items', on_delete=models.CASCADE
+    )
     primary_key = models.CharField(max_length=200)
     order = models.IntegerField()
     data = JSONField()
 
     class Meta:
-        unique_together = (
-            ('observer', 'order'),
-            ('observer', 'primary_key'),
-        )
+        unique_together = (('observer', 'order'), ('observer', 'primary_key'))
         ordering = ('observer', 'order')
 
     def __str__(self):
         return 'primary_key={primary_key} order={order} data={data}'.format(
-            primary_key=self.primary_key,
-            order=self.order,
-            data=repr(self.data),
+            primary_key=self.primary_key, order=self.order, data=repr(self.data)
         )
 
 
 class Dependency(models.Model):
     """Observer's dependency."""
 
-    observer = models.ForeignKey(Observer, related_name='dependencies', on_delete=models.CASCADE)
+    observer = models.ForeignKey(
+        Observer, related_name='dependencies', on_delete=models.CASCADE
+    )
     table = models.CharField(max_length=100)
 
     class Meta:

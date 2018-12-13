@@ -57,7 +57,9 @@ class Request(http_request.HttpRequest):
             hasher.update(self.path.encode('utf8'))
             hasher.update(self.path_info.encode('utf8'))
             if self._force_auth_user is not None:
-                hasher.update((text_type(self._force_auth_user.id) or 'anonymous').encode('utf8'))
+                hasher.update(
+                    (text_type(self._force_auth_user.id) or 'anonymous').encode('utf8')
+                )
             else:
                 hasher.update(b'anonymous')
             self._observe_id = hasher.hexdigest()
@@ -76,7 +78,7 @@ class Request(http_request.HttpRequest):
             'path': self.path,
             'path_info': self.path_info,
             'user': self._force_auth_user,
-            'observe_id': self._observe_id
+            'observe_id': self._observe_id,
         }
 
     def __setstate__(self, state):

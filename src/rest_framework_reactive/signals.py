@@ -58,7 +58,7 @@ def notify_observers(table, kind, primary_key=None):
                     'table': table,
                     'kind': kind,
                     'primary_key': str(primary_key),
-                }
+                },
             )
         except ChannelFull:
             logger.exception("Unable to notify workers.")
@@ -66,7 +66,9 @@ def notify_observers(table, kind, primary_key=None):
     batcher = PrioritizedBatcher.global_instance()
     if batcher.is_started:
         # If a batch is open, queue the send via the batcher.
-        batcher.add('rest_framework_reactive', handler, group_by=(table, kind, primary_key))
+        batcher.add(
+            'rest_framework_reactive', handler, group_by=(table, kind, primary_key)
+        )
     else:
         # If no batch is open, invoke immediately.
         handler()

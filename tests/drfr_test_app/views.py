@@ -11,9 +11,9 @@ from . import models, serializers
 
 
 @observable
-class ExampleItemViewSet(mixins.RetrieveModelMixin,
-                         mixins.ListModelMixin,
-                         viewsets.GenericViewSet):
+class ExampleItemViewSet(
+    mixins.RetrieveModelMixin, mixins.ListModelMixin, viewsets.GenericViewSet
+):
 
     queryset = models.ExampleItem.objects.all()
     serializer_class = serializers.ExampleItemSerializer
@@ -21,9 +21,9 @@ class ExampleItemViewSet(mixins.RetrieveModelMixin,
 
 
 @observable
-class ExampleSubItemViewSet(mixins.RetrieveModelMixin,
-                            mixins.ListModelMixin,
-                            viewsets.GenericViewSet):
+class ExampleSubItemViewSet(
+    mixins.RetrieveModelMixin, mixins.ListModelMixin, viewsets.GenericViewSet
+):
 
     queryset = models.ExampleSubItem.objects.all()
     serializer_class = serializers.ExampleSubItemSerializer
@@ -31,9 +31,9 @@ class ExampleSubItemViewSet(mixins.RetrieveModelMixin,
 
 
 @observable
-class PaginatedViewSet(mixins.RetrieveModelMixin,
-                       mixins.ListModelMixin,
-                       viewsets.GenericViewSet):
+class PaginatedViewSet(
+    mixins.RetrieveModelMixin, mixins.ListModelMixin, viewsets.GenericViewSet
+):
 
     queryset = models.ExampleItem.objects.all()
     serializer_class = serializers.ExampleItemSerializer
@@ -41,9 +41,9 @@ class PaginatedViewSet(mixins.RetrieveModelMixin,
 
 
 @observable
-class AggregationTestViewSet(mixins.RetrieveModelMixin,
-                             mixins.ListModelMixin,
-                             viewsets.GenericViewSet):
+class AggregationTestViewSet(
+    mixins.RetrieveModelMixin, mixins.ListModelMixin, viewsets.GenericViewSet
+):
 
     queryset = models.ExampleItem.objects.all()
     serializer_class = serializers.ExampleItemSerializer
@@ -56,14 +56,12 @@ class AggregationTestViewSet(mixins.RetrieveModelMixin,
         subquery, which uses the M2M relation.
         """
         queryset = self.filter_queryset(self.get_queryset())
-        return Response({
-            'count': queryset.count(),
-        })
+        return Response({'count': queryset.count()})
 
 
-class PollingObservableViewSet(mixins.RetrieveModelMixin,
-                               mixins.ListModelMixin,
-                               viewsets.GenericViewSet):
+class PollingObservableViewSet(
+    mixins.RetrieveModelMixin, mixins.ListModelMixin, viewsets.GenericViewSet
+):
 
     queryset = models.ExampleItem.objects.none()
     serializer_class = serializers.ExampleItemSerializer
@@ -71,12 +69,14 @@ class PollingObservableViewSet(mixins.RetrieveModelMixin,
     @observable
     @polling_observable(5)
     def list(self, request, *args, **kwargs):
-        return Response({'static': 'This is a polling observable: {}'.format(time.time())})
+        return Response(
+            {'static': 'This is a polling observable: {}'.format(time.time())}
+        )
 
 
-class NoDependenciesViewSet(mixins.RetrieveModelMixin,
-                            mixins.ListModelMixin,
-                            viewsets.GenericViewSet):
+class NoDependenciesViewSet(
+    mixins.RetrieveModelMixin, mixins.ListModelMixin, viewsets.GenericViewSet
+):
 
     queryset = models.ExampleItem.objects.none()
     serializer_class = serializers.ExampleItemSerializer

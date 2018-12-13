@@ -11,9 +11,7 @@ class ExampleItem(models.Model):
     name = models.CharField(max_length=30)
 
     class Meta:
-        permissions = (
-            ("view_exampleitem", "Can view example item"),
-        )
+        permissions = (("view_exampleitem", "Can view example item"),)
         ordering = ['pk']
 
 
@@ -22,9 +20,7 @@ class ExampleSubItem(models.Model):
     enabled = models.BooleanField()
 
     class Meta:
-        permissions = (
-            ("view_examplesubitem", "Can view example sub item"),
-        )
+        permissions = (("view_examplesubitem", "Can view example sub item"),)
         ordering = ['pk']
 
 

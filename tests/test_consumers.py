@@ -11,10 +11,21 @@ from channels.routing import URLRouter
 from channels.layers import get_channel_layer
 from rest_framework import test as api_test, request as api_request
 
-from rest_framework_reactive import request as observer_request, models as observer_models
-from rest_framework_reactive.consumers import ClientConsumer, PollObserversConsumer, WorkerConsumer
+from rest_framework_reactive import (
+    request as observer_request,
+    models as observer_models,
+)
+from rest_framework_reactive.consumers import (
+    ClientConsumer,
+    PollObserversConsumer,
+    WorkerConsumer,
+)
 from rest_framework_reactive.protocol import *
-from rest_framework_reactive.observer import QueryObserver, add_subscriber, remove_subscriber
+from rest_framework_reactive.observer import (
+    QueryObserver,
+    add_subscriber,
+    remove_subscriber,
+)
 
 from drfr_test_app import models, views
 
@@ -24,9 +35,7 @@ factory = api_test.APIRequestFactory()
 
 def create_request(viewset_class, **kwargs):
     request = observer_request.Request(
-        viewset_class,
-        'list',
-        api_request.Request(factory.get('/', kwargs))
+        viewset_class, 'list', api_request.Request(factory.get('/', kwargs))
     )
 
     return request
@@ -35,15 +44,12 @@ def create_request(viewset_class, **kwargs):
 @pytest.mark.django_db(transaction=True)
 @pytest.mark.asyncio
 async def test_worker_and_client():
-    client_consumer = URLRouter([
-        url(r'^ws/(?P<subscriber_id>.+)$', ClientConsumer),
-    ])
+    client_consumer = URLRouter([url(r'^ws/(?P<subscriber_id>.+)$', ClientConsumer)])
 
     client = WebsocketCommunicator(client_consumer, '/ws/test-session')
-    worker = ApplicationCommunicator(WorkerConsumer, {
-        'type': 'channel',
-        'channel': CHANNEL_WORKER_NOTIFY,
-    })
+    worker = ApplicationCommunicator(
+        WorkerConsumer, {'type': 'channel', 'channel': CHANNEL_WORKER_NOTIFY}
+    )
 
     # Connect client.
     status, _ = await client.connect()
@@ -52,7 +58,9 @@ async def test_worker_and_client():
     # Create an observer.
     @database_sync_to_async
     def create_observer():
-        observer = QueryObserver(create_request(views.PaginatedViewSet, offset=0, limit=10))
+        observer = QueryObserver(
+            create_request(views.PaginatedViewSet, offset=0, limit=10)
+        )
         items = observer.evaluate()
         assert not items
 
@@ -113,16 +121,13 @@ async def test_worker_and_client():
 
 @pytest.mark.asyncio
 async def test_poll_observer():
-    poller = ApplicationCommunicator(PollObserversConsumer, {
-        'type': 'channel',
-        'channel': CHANNEL_POLL_OBSERVER,
-    })
+    poller = ApplicationCommunicator(
+        PollObserversConsumer, {'type': 'channel', 'channel': CHANNEL_POLL_OBSERVER}
+    )
 
-    await poller.send_input({
-        'type': TYPE_POLL_OBSERVER,
-        'observer': 'test',
-        'interval': 5,
-    })
+    await poller.send_input(
+        {'type': TYPE_POLL_OBSERVER, 'observer': 'test', 'interval': 5}
+    )
 
     channel_layer = get_channel_layer()
 
@@ -143,19 +148,15 @@ async def test_poll_observer():
 @pytest.mark.django_db(transaction=True)
 @pytest.mark.asyncio
 async def test_poll_observer_integration():
-    client_consumer = URLRouter([
-        url(r'^ws/(?P<subscriber_id>.+)$', ClientConsumer),
-    ])
+    client_consumer = URLRouter([url(r'^ws/(?P<subscriber_id>.+)$', ClientConsumer)])
 
     client = WebsocketCommunicator(client_consumer, '/ws/test-session')
-    worker = ApplicationCommunicator(WorkerConsumer, {
-        'type': 'channel',
-        'channel': CHANNEL_WORKER_NOTIFY,
-    })
-    poller = ApplicationCommunicator(PollObserversConsumer, {
-        'type': 'channel',
-        'channel': CHANNEL_POLL_OBSERVER,
-    })
+    worker = ApplicationCommunicator(
+        WorkerConsumer, {'type': 'channel', 'channel': CHANNEL_WORKER_NOTIFY}
+    )
+    poller = ApplicationCommunicator(
+        PollObserversConsumer, {'type': 'channel', 'channel': CHANNEL_POLL_OBSERVER}
+    )
 
     # Connect client.
     status, _ = await client.connect()

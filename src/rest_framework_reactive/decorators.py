@@ -35,10 +35,14 @@ def observable(method_or_viewset):
     def wrapper(self, request, *args, **kwargs):
         if observer_request.OBSERVABLE_QUERY_PARAMETER in request.query_params:
             # TODO: Validate the session identifier.
-            session_id = request.query_params[observer_request.OBSERVABLE_QUERY_PARAMETER]
+            session_id = request.query_params[
+                observer_request.OBSERVABLE_QUERY_PARAMETER
+            ]
 
             # Create request and subscribe the session to given observer.
-            request = observer_request.Request(self.__class__, method_or_viewset.__name__, request, args, kwargs)
+            request = observer_request.Request(
+                self.__class__, method_or_viewset.__name__, request, args, kwargs
+            )
 
             # Create and evaluate observer.
             instance = observer.QueryObserver(request)
@@ -46,10 +50,7 @@ def observable(method_or_viewset):
                 data = instance.evaluate()
                 observer.add_subscriber(session_id, instance.id)
 
-            return response.Response({
-                'observer': instance.id,
-                'items': data,
-            })
+            return response.Response({'observer': instance.id, 'items': data})
         else:
             # Non-reactive API.
             return method_or_viewset(self, request, *args, **kwargs)

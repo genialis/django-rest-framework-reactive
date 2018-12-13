@@ -29,7 +29,6 @@ INSTALLED_APPS = (
     'django.contrib.contenttypes',
     'django.contrib.sessions',
     'django.contrib.staticfiles',
-
     'rest_framework',
     'channels',
     'guardian',
@@ -47,14 +46,12 @@ TEMPLATES = [
                 'django.template.context_processors.debug',
                 'django.template.context_processors.request',
                 'django.contrib.auth.context_processors.auth',
-            ],
+            ]
         },
-    },
+    }
 ]
 
-AUTHENTICATION_BACKENDS = (
-    'django.contrib.auth.backends.ModelBackend',
-)
+AUTHENTICATION_BACKENDS = ('django.contrib.auth.backends.ModelBackend',)
 
 ANONYMOUS_USER_NAME = 'public'
 
@@ -75,9 +72,7 @@ DATABASES = {
         'USER': pguser,
         'HOST': pghost,
         'PORT': pgport,
-        'TEST': {
-            'NAME': 'drfr_test' + toxenv
-        }
+        'TEST': {'NAME': 'drfr_test' + toxenv},
     }
 }
 
@@ -93,16 +88,12 @@ REST_FRAMEWORK = {
     ),
 }
 
-CHANNEL_LAYERS = {
-    'default': {
-        'BACKEND': 'channels.layers.InMemoryChannelLayer',
-    },
-}
+CHANNEL_LAYERS = {'default': {'BACKEND': 'channels.layers.InMemoryChannelLayer'}}
 
 ASGI_APPLICATION = 'rest_framework_reactive.routing.application'
 
 DJANGO_REST_FRAMEWORK_REACTIVE = {
     # Set update batch delay to zero during tests as otherwise they can be delayed
     # and cause test timeouts.
-    'update_batch_delay': 0,
+    'update_batch_delay': 0
 }

@@ -25,10 +25,7 @@ class PollObserversConsumer(AsyncConsumer):
         # Dispatch task to evaluate the observable.
         await self.channel_layer.send(
             CHANNEL_WORKER_NOTIFY,
-            {
-                'type': TYPE_EVALUATE_OBSERVER,
-                'observer': message['observer'],
-            }
+            {'type': TYPE_EVALUATE_OBSERVER, 'observer': message['observer']},
         )
 
 
@@ -65,24 +62,23 @@ class WorkerConsumer(SyncConsumer):
         """Process notification from ORM."""
         # Find all observers with dependencies on the given table and notify them.
         observers = list(
-            Observer.objects.filter(
-                dependencies__table=message['table']
-            ).distinct('pk').values_list('pk', flat=True)
+            Observer.objects.filter(dependencies__table=message['table'])
+            .distinct('pk')
+            .values_list('pk', flat=True)
         )
 
         for observer in observers:
             async_to_sync(self.channel_layer.send)(
                 CHANNEL_WORKER_NOTIFY,
-                {
-                    'type': TYPE_EVALUATE_OBSERVER,
-                    'observer': observer,
-                }
+                {'type': TYPE_EVALUATE_OBSERVER, 'observer': observer},
             )
 
     def observer_evaluate(self, message):
         """Evaluate observer."""
         try:
-            observer = Observer.objects.only('pk', 'request').get(pk=message['observer'])
+            observer = Observer.objects.only('pk', 'request').get(
+                pk=message['observer']
+            )
         except Observer.DoesNotExist:
             return
 
@@ -117,10 +113,12 @@ class ClientConsumer(JsonWebsocketConsumer):
         # Demultiplex observer update into multiple messages.
         for action in ('added', 'changed', 'removed'):
             for item in message[action]:
-                self.send_json({
-                    'msg': action,
-                    'observer': message['observer'],
-                    'primary_key': message['primary_key'],
-                    'order': item['order'],
-                    'item': item['data'],
-                })
+                self.send_json(
+                    {
+                        'msg': action,
+                        'observer': message['observer'],
+                        'primary_key': message['primary_key'],
+                        'order': item['order'],
+                        'item': item['data'],
+                    }
+                )

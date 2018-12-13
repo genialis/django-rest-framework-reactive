@@ -11,34 +11,61 @@ class Migration(migrations.Migration):
 
     initial = True
 
-    dependencies = [
-    ]
+    dependencies = []
 
     operations = [
         migrations.CreateModel(
             name='Dependency',
             fields=[
-                ('id', models.AutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
+                (
+                    'id',
+                    models.AutoField(
+                        auto_created=True,
+                        primary_key=True,
+                        serialize=False,
+                        verbose_name='ID',
+                    ),
+                ),
                 ('table', models.CharField(max_length=100)),
             ],
         ),
         migrations.CreateModel(
             name='Item',
             fields=[
-                ('id', models.AutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
+                (
+                    'id',
+                    models.AutoField(
+                        auto_created=True,
+                        primary_key=True,
+                        serialize=False,
+                        verbose_name='ID',
+                    ),
+                ),
                 ('primary_key', models.CharField(max_length=200)),
                 ('order', models.IntegerField()),
                 ('data', django.contrib.postgres.fields.jsonb.JSONField()),
             ],
-            options={
-                'ordering': ('observer', 'order'),
-            },
+            options={'ordering': ('observer', 'order')},
         ),
         migrations.CreateModel(
             name='Observer',
             fields=[
-                ('id', models.CharField(max_length=64, primary_key=True, serialize=False)),
-                ('status', models.CharField(choices=[('new', 'New'), ('observing', 'Observing'), ('stopped', 'Stopped')], default='new', max_length=15)),
+                (
+                    'id',
+                    models.CharField(max_length=64, primary_key=True, serialize=False),
+                ),
+                (
+                    'status',
+                    models.CharField(
+                        choices=[
+                            ('new', 'New'),
+                            ('observing', 'Observing'),
+                            ('stopped', 'Stopped'),
+                        ],
+                        default='new',
+                        max_length=15,
+                    ),
+                ),
                 ('request', models.BinaryField()),
                 ('last_evaluation', models.DateTimeField(auto_now_add=True)),
                 ('poll_interval', models.IntegerField(null=True)),
@@ -47,7 +74,10 @@ class Migration(migrations.Migration):
         migrations.CreateModel(
             name='Subscriber',
             fields=[
-                ('session_id', models.CharField(max_length=100, primary_key=True, serialize=False)),
+                (
+                    'session_id',
+                    models.CharField(max_length=100, primary_key=True, serialize=False),
+                ),
                 ('created', models.DateTimeField(auto_now_add=True)),
             ],
         ),
@@ -59,19 +89,26 @@ class Migration(migrations.Migration):
         migrations.AddField(
             model_name='item',
             name='observer',
-            field=models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, related_name='items', to='rest_framework_reactive.Observer'),
+            field=models.ForeignKey(
+                on_delete=django.db.models.deletion.CASCADE,
+                related_name='items',
+                to='rest_framework_reactive.Observer',
+            ),
         ),
         migrations.AddField(
             model_name='dependency',
             name='observer',
-            field=models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, related_name='dependencies', to='rest_framework_reactive.Observer'),
+            field=models.ForeignKey(
+                on_delete=django.db.models.deletion.CASCADE,
+                related_name='dependencies',
+                to='rest_framework_reactive.Observer',
+            ),
         ),
         migrations.AlterUniqueTogether(
             name='item',
             unique_together=set([('observer', 'primary_key'), ('observer', 'order')]),
         ),
         migrations.AlterUniqueTogether(
-            name='dependency',
-            unique_together=set([('observer', 'table')]),
+            name='dependency', unique_together=set([('observer', 'table')])
         ),
     ]

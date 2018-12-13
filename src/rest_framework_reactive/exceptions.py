@@ -1,5 +1,3 @@
-
-
 class QueryObserverException(Exception):
     pass
 

@@ -7,6 +7,8 @@ from django.db.models.sql import compiler
 INTERCEPTOR_TLS = threading.local()
 
 _original_as_sql = compiler.SQLCompiler.as_sql
+
+
 def intercept_as_sql(compiler, *args, **kwargs):
     result = _original_as_sql(compiler, *args, **kwargs)
     tables = getattr(INTERCEPTOR_TLS, 'tables', None)
@@ -15,6 +17,7 @@ def intercept_as_sql(compiler, *args, **kwargs):
 
     tables.update([table for table in compiler.query.tables if table != table.upper()])
     return result
+
 
 # Monkey patch the SQLCompiler class to get all referenced tables in a code block.
 compiler.SQLCompiler.as_sql = intercept_as_sql

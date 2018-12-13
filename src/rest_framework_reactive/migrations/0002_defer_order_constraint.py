@@ -10,22 +10,24 @@ UNIQUE_INDEX_NAME = 'rest_framework_reactive_item_observer_id_order_9b8adde6_uni
 
 class Migration(migrations.Migration):
 
-    dependencies = [
-        ('rest_framework_reactive', '0001_initial'),
-    ]
+    dependencies = [('rest_framework_reactive', '0001_initial')]
 
     operations = [
         migrations.RunSQL(
             [
                 # Drop old constraint.
-                "ALTER TABLE rest_framework_reactive_item DROP CONSTRAINT {}".format(UNIQUE_INDEX_NAME),
+                "ALTER TABLE rest_framework_reactive_item DROP CONSTRAINT {}".format(
+                    UNIQUE_INDEX_NAME
+                ),
                 # Re-create the unique index.
                 "CREATE UNIQUE INDEX {} ON rest_framework_reactive_item (observer_id, \"order\")".format(
                     UNIQUE_INDEX_NAME
                 ),
                 # Create new deferrable constraint.
                 """ALTER TABLE rest_framework_reactive_item ADD CONSTRAINT
-                {0} UNIQUE USING INDEX {0} DEFERRABLE INITIALLY IMMEDIATE""".format(UNIQUE_INDEX_NAME),
-            ],
+                {0} UNIQUE USING INDEX {0} DEFERRABLE INITIALLY IMMEDIATE""".format(
+                    UNIQUE_INDEX_NAME
+                ),
+            ]
         )
     ]
