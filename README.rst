@@ -2,11 +2,31 @@
 Django REST Framework Reactive
 ==============================
 
-|build|
+|build| |docs| |pypi_version| |pypi_pyversions| |pypi_downloads| |code_style|
 
 .. |build| image:: https://travis-ci.org/genialis/django-rest-framework-reactive.svg?branch=master
     :target: https://travis-ci.org/genialis/django-rest-framework-reactive
     :alt: Build Status
+
+.. |docs| image:: https://readthedocs.org/projects/djangorestframework-reactive/badge/?version=latest
+    :target: http://djangorestframework-reactive.readthedocs.io/
+    :alt: Documentation Status
+
+.. |pypi_version| image:: https://img.shields.io/pypi/v/djangorestframework-reactive.svg
+    :target: https://pypi.org/project/djangorestframework-reactive
+    :alt: Version on PyPI
+
+.. |pypi_pyversions| image:: https://img.shields.io/pypi/pyversions/djangorestframework-reactive.svg
+    :target: https://pypi.org/project/djangorestframework-reactive
+    :alt: Supported Python versions
+
+.. |pypi_downloads| image:: https://pepy.tech/badge/djangorestframework-reactive
+    :target: https://pepy.tech/project/djangorestframework-reactive
+    :alt: Number of downloads from PyPI
+
+.. |code_style| image:: https://img.shields.io/badge/code%20style-black-black.svg
+    :target: https://black.readthedocs.io/
+    :alt: Code style: black
 
 This package enables regular Django REST Framework views to become reactive,
 that is so that client-side applications may get notified of changes to the
