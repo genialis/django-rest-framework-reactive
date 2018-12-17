@@ -11,6 +11,7 @@ Unreleased
 
 Changed
 -------
+* **BACKWARD INCOMPATIBLE:** Overhaul Python source distribution (sdist)
 * Support PostgreSQL 10
 
 
