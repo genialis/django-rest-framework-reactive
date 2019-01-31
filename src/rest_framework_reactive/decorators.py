@@ -46,9 +46,8 @@ def observable(method_or_viewset):
 
             # Create and evaluate observer.
             instance = observer.QueryObserver(request)
-            with transaction.atomic():
-                data = instance.evaluate()
-                observer.add_subscriber(session_id, instance.id)
+            data = instance.evaluate()
+            observer.add_subscriber(session_id, instance.id)
 
             return response.Response({'observer': instance.id, 'items': data})
         else:

@@ -14,6 +14,11 @@ Changed
 * **BACKWARD INCOMPATIBLE:** Overhaul Python source distribution (sdist)
 * Support PostgreSQL 10
 
+Fixed
+-----
+* Make code more robust for database integrity errors in multi-process
+  environments
+
 
 ================
 3.1.0 2018-10-19
