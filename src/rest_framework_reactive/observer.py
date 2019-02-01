@@ -155,9 +155,7 @@ class QueryObserver(object):
                 # Log slow observers.
                 if duration > settings['warnings']['max_processing_time']:
                     logger.warning(
-                        "Slow observed viewset ({})".format(
-                            self._get_logging_id()
-                        ),
+                        "Slow observed viewset ({})".format(self._get_logging_id()),
                         extra=self._get_logging_extra(duration=duration),
                     )
 
@@ -167,9 +165,7 @@ class QueryObserver(object):
                         "Stopped extremely slow observed viewset ({})".format(
                             self._get_logging_id()
                         ),
-                        extra=self._get_logging_extra(
-                            stopped=True, duration=duration
-                        ),
+                        extra=self._get_logging_extra(stopped=True, duration=duration),
                     )
                     observer.delete()
 
