@@ -9,7 +9,7 @@ from rest_framework import test as api_test, request as api_request
 
 from rest_framework_reactive import models as observer_models
 from rest_framework_reactive import request as observer_request
-from rest_framework_reactive.observer import add_subscriber, QueryObserver
+from rest_framework_reactive.observer import add_subscriber, remove_subscriber, QueryObserver
 
 from drfr_test_app import models, views
 
@@ -389,3 +389,28 @@ class QueryObserversTestCase(test.TestCase):
         # Observer should have been removed because there are no dependencies.
 
         self.assertFalse(observer_models.Observer.objects.exists())
+
+    def test_remove_subscriber(self):
+        # This test simulates the observable decorator behavior.
+
+        # User opens a WebSocket session and creates a request with observe parameter
+        observer = QueryObserver(self.request(views.ExampleItemViewSet))
+        items = observer.evaluate()
+        add_subscriber('test-session', observer.id)
+        self.assertEquals(observer_models.Observer.objects.count(), 1)
+        self.assertEquals(observer_models.Subscriber.objects.count(), 1)
+
+        # User closes a WebSocket
+        # This removes the subscriber but the observer remains
+        remove_subscriber('test-session', observer.id)
+        self.assertEquals(observer_models.Observer.objects.count(), 1)
+        self.assertEquals(observer_models.Subscriber.objects.count(), 0)
+
+        # User opens a WebSocket again and creates the same request with observe parameter
+        # You would expect one observer and one subscriber, but the observer is
+        # actually deleted
+        observer = QueryObserver(self.request(views.ExampleItemViewSet))
+        items = observer.evaluate()
+        add_subscriber('test-session', observer.id)
+        self.assertEquals(observer_models.Subscriber.objects.count(), 1)
+        self.assertEquals(observer_models.Observer.objects.count(), 1)
