@@ -56,13 +56,15 @@ class WorkerConsumer(SyncConsumer):
         executor = self._get_executor(state)
 
         # Evaluate observer.
-        executor.evaluate(return_full=False)
+        executor.evaluate()
 
     def orm_notify_table(self, message):
         """Process notification from ORM."""
         # Find all observers with dependencies on the given table and notify them.
         observers = list(
-            Observer.objects.filter(dependencies__table=message['table'])
+            Observer.objects.filter(
+                dependencies__table=message['table'], subscribers__isnull=False
+            )
             .distinct('pk')
             .values_list('pk', flat=True)
         )

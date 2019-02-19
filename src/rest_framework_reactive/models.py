@@ -3,23 +3,11 @@ from django.db import models, transaction
 
 
 class Observer(models.Model):
-    """State for an observer."""
-
-    # Observer status.
-    STATUS_NEW = 'new'
-    STATUS_OBSERVING = 'observing'
-    STATUS_STOPPED = 'stopped'
-
-    STATUS_CHOICES = (
-        (STATUS_NEW, "New"),
-        (STATUS_OBSERVING, "Observing"),
-        (STATUS_STOPPED, "Stopped"),
-    )
+    """State of an observer."""
 
     id = models.CharField(primary_key=True, max_length=64)
-    status = models.CharField(max_length=15, choices=STATUS_CHOICES, default=STATUS_NEW)
     request = models.BinaryField()
-    last_evaluation = models.DateTimeField(auto_now_add=True)
+    last_evaluation = models.DateTimeField(null=True)
     poll_interval = models.IntegerField(null=True)
     subscribers = models.ManyToManyField('Subscriber')
 

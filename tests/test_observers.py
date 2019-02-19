@@ -9,7 +9,8 @@ from rest_framework import test as api_test, request as api_request
 
 from rest_framework_reactive import models as observer_models
 from rest_framework_reactive import request as observer_request
-from rest_framework_reactive.observer import add_subscriber, QueryObserver
+
+from rest_framework_reactive.observer import remove_subscriber, QueryObserver
 
 from drfr_test_app import models, views
 
@@ -17,22 +18,19 @@ from drfr_test_app import models, views
 factory = api_test.APIRequestFactory()
 
 
+def request(viewset_class, **kwargs):
+    request = observer_request.Request(
+        viewset_class, 'list', api_request.Request(factory.get('/', kwargs))
+    )
+
+    # Simulate serialization.
+    return pickle.loads(pickle.dumps(request))
+
+
 class QueryObserversTestCase(test.TestCase):
-    def request(self, viewset_class, **kwargs):
-        request = observer_request.Request(
-            viewset_class, 'list', api_request.Request(factory.get('/', kwargs))
-        )
-
-        # Simulate serialization.
-        return pickle.loads(pickle.dumps(request))
-
     def test_paginated_viewset(self):
-        observer = QueryObserver(
-            self.request(views.PaginatedViewSet, offset=0, limit=10)
-        )
-        items = observer.evaluate()
-
-        add_subscriber('test-session', observer.id)
+        observer = QueryObserver(request(views.PaginatedViewSet, offset=0, limit=10))
+        items = observer.subscribe('test-session')
 
         self.assertEquals(len(items), 0)
 
@@ -64,20 +62,16 @@ class QueryObserversTestCase(test.TestCase):
             item,
         )
 
-        observer = QueryObserver(self.request(views.ExampleItemViewSet))
-        items = observer.evaluate()
-
-        add_subscriber('test-session', observer.id)
+        observer = QueryObserver(request(views.ExampleItemViewSet))
+        items = observer.subscribe('test-session')
 
         # Ensure items can be serialized into JSON.
-        json.dumps(items)
+        # json.dumps(items)
 
     def test_observe_viewset(self):
         # Create a request and an observer for it.
-        observer = QueryObserver(self.request(views.ExampleItemViewSet))
-        items = observer.evaluate()
-
-        add_subscriber('test-session', observer.id)
+        observer = QueryObserver(request(views.ExampleItemViewSet))
+        items = observer.subscribe('test-session')
 
         self.assertEquals(
             observer.id,
@@ -162,10 +156,8 @@ class QueryObserversTestCase(test.TestCase):
         self.assertEquals(removed[0]['data'], expected_serialized_item)
 
     def test_conditions(self):
-        observer = QueryObserver(self.request(views.ExampleItemViewSet, enabled=True))
-        items = observer.evaluate()
-
-        add_subscriber('test-session', observer.id)
+        observer = QueryObserver(request(views.ExampleItemViewSet, enabled=True))
+        items = observer.subscribe('test-session')
 
         self.assertEquals(
             observer.id,
@@ -226,11 +218,9 @@ class QueryObserversTestCase(test.TestCase):
         )
 
         observer = QueryObserver(
-            self.request(views.ExampleSubItemViewSet, parent__enabled=True)
+            request(views.ExampleSubItemViewSet, parent__enabled=True)
         )
-        items = observer.evaluate()
-
-        add_subscriber('test-session', observer.id)
+        items = observer.subscribe('test-session')
 
         self.assertEquals(
             observer.id,
@@ -259,11 +249,9 @@ class QueryObserversTestCase(test.TestCase):
         )
 
         observer = QueryObserver(
-            self.request(views.AggregationTestViewSet, items=[m2m_item.pk])
+            request(views.AggregationTestViewSet, items=[m2m_item.pk])
         )
-        observer.evaluate()
-
-        add_subscriber('test-session', observer.id)
+        observer.subscribe('test-session')
 
         # There should be a dependency on the intermediate table.
         observer_state = observer_models.Observer.objects.get(pk=observer.id)
@@ -271,12 +259,8 @@ class QueryObserversTestCase(test.TestCase):
         self.assertIn('drfr_test_app_examplem2mitem_items', dependencies)
 
     def test_order(self):
-        observer = QueryObserver(
-            self.request(views.ExampleItemViewSet, ordering='name')
-        )
-        items = observer.evaluate()
-
-        add_subscriber('test-session', observer.id)
+        observer = QueryObserver(request(views.ExampleItemViewSet, ordering='name'))
+        items = observer.subscribe('test-session')
 
         self.assertEquals(len(items), 0)
 
@@ -378,14 +362,74 @@ class QueryObserversTestCase(test.TestCase):
         self.assertEquals(len(removed), 0)
 
     def test_no_dependencies(self):
-        observer = QueryObserver(self.request(views.NoDependenciesViewSet))
-        items = observer.evaluate()
+        observer = QueryObserver(request(views.NoDependenciesViewSet))
+        items = observer.subscribe('test-session')
 
-        add_subscriber('test-session', observer.id)
-
+        # Observer should not be created because there are no dependencies.
         self.assertEquals(len(items), 1)
-        self.assertEqual(items[0], {'id': 1, 'static': 'This has no dependencies'})
-
-        # Observer should have been removed because there are no dependencies.
-
         self.assertFalse(observer_models.Observer.objects.exists())
+
+    def test_remove_subscriber(self):
+        # Simulate opening a WebSocket.
+        # This should create an observer and subscribe a subscriber.
+        query_observer = QueryObserver(request(views.ExampleItemViewSet))
+        items = query_observer.subscribe('test-session')
+        observer = observer_models.Observer.objects.get(id=query_observer.id)
+
+        self.assertEquals(observer_models.Observer.objects.count(), 1)
+        self.assertEquals(observer.subscribers.count(), 1)
+
+        # Simulate closing a WebSocket.
+        # This removes the subscriber but the observer remains.
+        remove_subscriber('test-session', observer.id)
+        self.assertEquals(observer_models.Observer.objects.count(), 1)
+        self.assertEquals(observer.subscribers.count(), 0)
+
+        # Simulate opening a WebSocket again.
+        # This should add a subscriber to existing observer.
+        query_observer = QueryObserver(request(views.ExampleItemViewSet))
+        items = query_observer.subscribe('test-session')
+        self.assertEquals(observer_models.Subscriber.objects.count(), 1)
+        self.assertEquals(observer.subscribers.count(), 1)
+
+
+class QueryObserversTransactionTestCase(test.TransactionTestCase):
+    def test_subscribe(self):
+        observer = QueryObserver(request(views.ExampleItemViewSet))
+        observer_qs = observer_models.Observer.objects
+
+        # Subscribe new subscriber to new observer.
+        observer.subscribe('test-session')
+        self.assertEquals(observer_qs.count(), 1)
+        self.assertEquals(observer_qs.first().subscribers.count(), 1)
+
+        # Subscribe new subscriber to existing observer.
+        observer.subscribe('test-session2')
+        self.assertEquals(observer_qs.count(), 1)
+        self.assertEquals(observer_qs.first().subscribers.count(), 2)
+
+        # Subscribe existing subscriber to new observer.
+        observer_qs.all().delete()
+        self.assertEquals(observer_qs.count(), 0)
+        self.assertEquals(observer_models.Subscriber.objects.count(), 2)
+        observer.subscribe('test-session')
+        self.assertEquals(observer_qs.count(), 1)
+        self.assertEquals(observer_qs.first().subscribers.count(), 1)
+
+        # Subscribe existing subscriber to existing observer.
+        # Note that when a subscriber is already subscribed to the observer,
+        # we should ignore duplicate key violation.
+        observer.subscribe('test-session')
+        self.assertEquals(observer_qs.count(), 1)
+        self.assertEquals(observer_qs.first().subscribers.count(), 1)
+
+        # Test that custom SQL query in subscribe serializes the request
+        # string the same as Django create.
+        observer_obj = observer_qs.first()
+        observer_with_same_request = observer_models.Observer.objects.create(
+            id='request-comparisson', request=pickle.dumps(observer._request)
+        )
+
+        self.assertEquals(
+            bytes(observer_obj.request), bytes(observer_with_same_request.request)
+        )

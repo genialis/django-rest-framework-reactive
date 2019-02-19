@@ -11,6 +11,12 @@ Unreleased
 
 Changed
 -------
+* **BACKWARD INCOMPATIBLE:** Ensure observers exist when subscribing. Subscribe
+  (and observer creation) was separated from the evaluation step. Subscribe
+  includes subscriber and observer creation if needed, and executes in single
+  query. Observer instances are not removed from database anymore. Observers
+  without subscribers are skipped to optimize performance. Observers and
+  subscribers can be deleted using ``clearobservers`` Django command.
 * **BACKWARD INCOMPATIBLE:** Overhaul Python source distribution (sdist)
 * Support PostgreSQL 10
 

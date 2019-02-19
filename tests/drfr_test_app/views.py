@@ -67,7 +67,7 @@ class PollingObservableViewSet(
     serializer_class = serializers.ExampleItemSerializer
 
     @observable
-    @polling_observable(5)
+    @polling_observable(2)
     def list(self, request, *args, **kwargs):
         return Response(
             {'static': 'This is a polling observable: {}'.format(time.time())}

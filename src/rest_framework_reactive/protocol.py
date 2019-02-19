@@ -10,7 +10,7 @@ TYPE_ORM_NOTIFY_TABLE = 'orm.notify_table'
 # Message type for evaluating an observer.
 TYPE_EVALUATE_OBSERVER = 'observer.evaluate'
 # Message type for polling observable evaluation.
-TYPE_POLL_OBSERVER = 'poll_observer'
+TYPE_POLL_OBSERVER = 'poll.observer'
 # Message type for observer item updates.
 TYPE_ITEM_UPDATE = 'observer.update'
 

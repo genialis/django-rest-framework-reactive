@@ -34,7 +34,7 @@ def model_post_migrate(*args, **kwargs):
 
 
 def notify_observers(table, kind, primary_key=None):
-    """Transmit ORM table change notifcation.
+    """Transmit ORM table change notification.
 
     :param table: Name of the table that has changed
     :param kind: Change type

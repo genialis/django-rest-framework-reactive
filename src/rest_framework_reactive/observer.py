@@ -91,8 +91,8 @@ class QueryObserver(object):
         viewset.format_kwarg = None
         viewset.args = request.args
         viewset.kwargs = request.kwargs
-        self._viewset = viewset
         self._request = request
+        self._viewset = viewset
         self._viewset_method = getattr(viewset, request.viewset_method)
         self._meta = Options(viewset, self._viewset_method)
 
@@ -101,10 +101,9 @@ class QueryObserver(object):
         """Unique observer identifier."""
         return self._request.observe_id
 
-    def _get_logging_extra(self, stopped=False, duration=None, results=None):
+    def _get_logging_extra(self, duration=None, results=None):
         """Extra information for logger."""
         return {
-            'stopped': stopped,
             'duration': duration,
             'results': results,
             'observer_id': self.id,
@@ -125,274 +124,329 @@ class QueryObserver(object):
             self._request.viewset_method,
         )
 
-    def evaluate(self, return_full=True, return_emitted=False):
+    def _warning(self, msg, duration=None, results=None):
+        """Log warnings."""
+        logger.warning(
+            "{} ({})".format(msg, self._get_logging_id()),
+            extra=self._get_logging_extra(duration=duration, results=results),
+        )
+
+    def subscribe(self, session_id):
+        """Initialize observer and register subscriber.
+
+        :param session_id: Subscriber's session identifier
+        """
+        try:
+            change_detection = self._meta.change_detection
+            if change_detection not in [
+                Options.CHANGE_DETECTION_PUSH,
+                Options.CHANGE_DETECTION_POLL,
+            ]:
+                raise NotImplementedError(
+                    "Change detection mechanism '{}' not implemented.".format(
+                        change_detection
+                    )
+                )
+
+            tables = set()
+            with QueryInterceptor().intercept(tables):
+                viewset_results = self._viewset_results()
+
+            if not tables and change_detection == Options.CHANGE_DETECTION_PUSH:
+                self._warning("Will not create PUSH observer without dependencies")
+                return viewset_results
+
+            poll_interval = (
+                self._meta.poll_interval
+                if change_detection == Options.CHANGE_DETECTION_POLL
+                else None
+            )
+
+            # Subscribe to observer in a single query. First, create an
+            # observer, then create a subscriber, and finally subscribe to
+            # the observer. If already subscribed, ignore the conflict.
+            for retry in range(MAX_INTEGRITY_ERROR_RETRIES):
+                is_subscribed = False
+                cursor = connection.cursor()
+                try:
+                    cursor.execute(
+                        """
+                        WITH inserted_observer AS (
+                            INSERT into {observer_table} ("id", "request", "poll_interval")
+                            VALUES (%(observer_id)s, %(request)s, %(poll_interval)s)
+                            ON CONFLICT DO NOTHING
+                        ), inserted_subscriber AS (
+                            INSERT into {subscriber_table} ("session_id", "created")
+                            VALUES (%(subscriber_id)s, NOW())
+                            ON CONFLICT DO NOTHING
+                        )
+                        INSERT INTO {observer_subscribers_table} ("observer_id", "subscriber_id")
+                        VALUES (%(observer_id)s, %(subscriber_id)s)
+                        """.format(
+                            observer_table=models.Observer._meta.db_table,
+                            subscriber_table=models.Subscriber._meta.db_table,
+                            observer_subscribers_table=models.Observer.subscribers.through._meta.db_table,
+                        ),
+                        params={
+                            'observer_id': self.id,
+                            'request': pickle.dumps(self._request),
+                            'poll_interval': poll_interval,
+                            'subscriber_id': session_id,
+                        },
+                    )
+                    is_subscribed = True
+                except IntegrityError as err:
+                    msg = str(err)
+                    if (
+                        'Key (observer_id, subscriber_id)' in msg
+                        and 'already exists' in msg
+                    ):
+                        # Subscriber already subscribed, we're good.
+                        is_subscribed = True
+                    elif (
+                        'Key (observer_id)' in msg or 'Key (subscriber_id)' in msg
+                    ) and 'not present in table' in msg:
+                        # Could not subscribe because observer, subscriber or
+                        # both are missing, retry.
+                        if retry == MAX_INTEGRITY_ERROR_RETRIES - 1:
+                            raise
+                    else:
+                        raise
+                finally:
+                    cursor.close()
+
+                if is_subscribed:
+                    break
+
+            # Determine who should notify us based on the configured change
+            # detection mechanism.
+            if change_detection == Options.CHANGE_DETECTION_PUSH:
+                # Register table dependencies for push observables.
+                for table in tables:
+                    try:
+                        models.Dependency.objects.get_or_create(
+                            observer_id=self.id, table=table
+                        )
+                    except models.Observer.DoesNotExist:
+                        # The observer was removed before dependency tables
+                        # were created.
+                        return viewset_results
+
+                # If no dependencies, the observer will not be triggered.
+                if not tables:
+                    self._warning("Push observer without dependencies")
+
+            self._evaluate(viewset_results, emit_updates=False)
+
+        except Exception:
+            logger.exception(
+                "Error while subscribing to observer ({})".format(
+                    self._get_logging_id()
+                ),
+                extra=self._get_logging_extra(),
+            )
+
+        return viewset_results
+
+    def evaluate(self, return_emitted=False):
         """Evaluate the query observer.
 
-        :param return_full: True if the full set of rows should be returned
-        :param return_emitted: True if the emitted diffs should be returned
+        :param return_emitted: True if the emitted diffs should be returned (testing only)
         """
-
         try:
             settings = get_queryobserver_settings()
 
-            for retry in range(MAX_INTEGRITY_ERROR_RETRIES):
-                try:
-                    with transaction.atomic():
-                        # Obtain the observer state and lock it. This prevents an observer from being
-                        # processed in parallel from multiple different workers.
-                        observer, _ = models.Observer.objects.select_for_update().get_or_create(
-                            id=self.id,
-                            defaults={'request': pickle.dumps(self._request)},
-                        )
+            start = time.time()
+            # Evaluate the observer
+            emitted_results = self._evaluate(return_emitted=return_emitted)
+            duration = time.time() - start
 
-                        # Evaluate the observer.
-                        start = time.time()
-                        result = self._evaluate(observer, return_full, return_emitted)
-                        duration = time.time() - start
+            # Log slow observers.
+            if duration > settings['warnings']['max_processing_time']:
+                self._warning("Slow observed viewset", duration=duration)
 
-                        # Log slow observers.
-                        if duration > settings['warnings']['max_processing_time']:
-                            logger.warning(
-                                "Slow observed viewset ({})".format(
-                                    self._get_logging_id()
-                                ),
-                                extra=self._get_logging_extra(duration=duration),
-                            )
+            # Remove subscribers of really slow observers.
+            if duration > settings['errors']['max_processing_time']:
+                logger.error(
+                    "Removing subscribers to extremely slow observed viewset ({})".format(
+                        self._get_logging_id()
+                    ),
+                    extra=self._get_logging_extra(duration=duration),
+                )
+                observer.subscribers.all().delete()
 
-                        # Stop really slow observers.
-                        if duration > settings['errors']['max_processing_time']:
-                            logger.error(
-                                "Stopped extremely slow observed viewset ({})".format(
-                                    self._get_logging_id()
-                                ),
-                                extra=self._get_logging_extra(
-                                    stopped=True, duration=duration
-                                ),
-                            )
-                            observer.delete()
+            return emitted_results
 
-                        return result
-                except IntegrityError:
-                    # If an IntegrityError occurrs we need to rollback the transaction and retry observer
-                    # evaluation as another transaction may be creating an observer concurrently.
-                    if retry == MAX_INTEGRITY_ERROR_RETRIES - 1:
-                        raise
-
-                    continue
-
-            # Should never be reached.
-            assert False
-        except:  # pylint: disable=bare-except
+        except Exception:
             logger.exception(
                 "Error while evaluating observer ({})".format(self._get_logging_id()),
                 extra=self._get_logging_extra(),
             )
-            return []
 
-    def _evaluate(self, observer, return_full=True, return_emitted=False):
-        """Evaluates the query observer.
+    def _viewset_results(self):
+        """Parse results from the viewset response."""
+        results = []
+        try:
+            response = self._viewset_method(
+                self._viewset.request, *self._request.args, **self._request.kwargs
+            )
 
-        This method must be run in a transaction with the `observer` locked
-        for update.
+            if response.status_code == 200:
+                results = response.data
 
-        :param observer: Observer state model instance
-        :param return_full: True if the full set of rows should be returned
-        :param return_emitted: True if the emitted diffs should be returned
-        """
-        # Evaluate the viewset, intercepting all queries to evaluate dependencies.
-        tables = set()
-        stop_observer = False
-        with QueryInterceptor().intercept(tables):
-            try:
-                response = self._viewset_method(
-                    self._viewset.request, *self._request.args, **self._request.kwargs
-                )
-
-                if response.status_code == 200:
-                    results = response.data
-
-                    if not isinstance(results, list):
-                        if isinstance(results, dict):
-                            if 'results' in results and isinstance(
-                                results['results'], list
-                            ):
-                                # Support paginated results.
-                                results = results['results']
-                            else:
-                                results.setdefault(self._meta.primary_key, 1)
-                                results = [collections.OrderedDict(results)]
+                if not isinstance(results, list):
+                    if isinstance(results, dict):
+                        # XXX: This can incidently match if a single
+                        # object has results key
+                        if 'results' in results and isinstance(
+                            results['results'], list
+                        ):
+                            # Support paginated results.
+                            results = results['results']
                         else:
-                            raise ValueError(
-                                "Observable views must return a dictionary or a list of dictionaries!"
-                            )
-                else:
-                    results = []
-            except Http404:
-                results = []
-            except django_exceptions.ObjectDoesNotExist:
-                # The evaluation may fail when certain dependent objects (like users) are removed
-                # from the database. In this case, the observer is stopped.
-                stop_observer = True
+                            results.setdefault(self._meta.primary_key, 1)
+                            results = [collections.OrderedDict(results)]
+                    else:
+                        raise ValueError(
+                            "Observable views must return a dictionary or a list of dictionaries!"
+                        )
+        except Http404:
+            pass
+        except django_exceptions.ObjectDoesNotExist:
+            # The evaluation may fail when certain dependent objects (like users) are removed
+            # from the database. In this case, the observer is stopped.
+            pass
 
-        # Check if observer should be stopped.
-        if stop_observer:
-            observer.delete()
-            return []
+        return results
 
-        # Determine who should notify us based on the configured change detection mechanism.
-        if self._meta.change_detection == Options.CHANGE_DETECTION_PUSH:
-            # Register table dependencies for push observables.
-            for table in tables:
-                models.Dependency.objects.get_or_create(observer=observer, table=table)
+    def _evaluate(self, viewset_results=None, emit_updates=True, return_emitted=False):
+        """Evaluate query observer.
 
-            # If there are no dependencies, this observer should be stopped.
-            if not tables:
-                logger.warning(
-                    "Stopping push-based observer without dependencies ({})".format(
-                        self._get_logging_id()
-                    ),
-                    extra=self._get_logging_extra(stopped=True),
+        :param viewset_results: Objects returned by the viewset query
+        :param emit_updates: Send changes to subscribers
+        :param return_emitted: True if the emitted diffs should be returned (testing only)
+        """
+        if viewset_results is None:
+            viewset_results = self._viewset_results()
+
+        try:
+            observer = models.Observer.objects.get(id=self.id)
+            # Do not evaluate the observer if there are no subscribers
+            if observer.subscribers.count() == 0:
+                return
+
+            # Update last evaluation time.
+            models.Observer.objects.filter(id=self.id).update(
+                last_evaluation=timezone.now()
+            )
+
+            # Log viewsets with too much output.
+            max_result = get_queryobserver_settings()['warnings']['max_result_length']
+            if len(viewset_results) > max_result:
+                self._warning(
+                    "Observed viewset returns too many results",
+                    results=len(viewset_results),
+                )
+            new_results = collections.OrderedDict()
+            for order, item in enumerate(viewset_results):
+                if not isinstance(item, dict):
+                    raise ValueError(
+                        "Observable views must return a dictionary or a list of dictionaries!"
+                    )
+
+                item = {'order': order, 'data': item}
+
+                try:
+                    new_results[str(item['data'][self._meta.primary_key])] = item
+                except KeyError:
+                    raise KeyError(
+                        "Observable view did not return primary key field '{}'!".format(
+                            self._meta.primary_key
+                        )
+                    )
+
+            # Process difference between old results and new results.
+            added, changed = [], []
+            new_ids = list(new_results.keys())
+
+            removed_qs = observer.items.exclude(primary_key__in=new_results.keys())
+            removed = list(removed_qs.values('order', 'data'))
+
+            maybe_changed_qs = observer.items.filter(primary_key__in=new_results.keys())
+
+            with transaction.atomic():
+                # Removed items.
+                removed_qs.delete()
+
+                # Defer unique ordering constraint before processing order updates.
+                # NOTE: The name of the constrait is generated by Django ORM.
+                with connection.cursor() as cursor:
+                    cursor.execute(
+                        "SET CONSTRAINTS rest_framework_reactive_item_observer_id_order_9b8adde6_uniq DEFERRED"
+                    )
+
+                # Changed items.
+                for item_id, old_order, old_data in maybe_changed_qs.values_list(
+                    'primary_key', 'order', 'data'
+                ):
+                    new_item = new_results[item_id]
+                    new_ids.remove(item_id)
+
+                    if new_item['data'] != old_data:
+                        changed.append(new_item)
+                        observer.items.filter(primary_key=item_id).update(
+                            data=new_item['data'], order=new_item['order']
+                        )
+                    elif new_item['order'] != old_order:
+                        # TODO: If only order has changed, don't transmit full data (needs frontend support).
+                        changed.append(new_item)
+                        observer.items.filter(primary_key=item_id).update(
+                            order=new_item['order']
+                        )
+
+                # Added items.
+                for item_id in new_ids:
+                    item = new_results[item_id]
+                    added.append(item)
+                    observer.items.create(
+                        primary_key=item_id, order=item['order'], data=item['data']
+                    )
+
+            if self._meta.change_detection == Options.CHANGE_DETECTION_POLL:
+                # Register poller.
+                async_to_sync(get_channel_layer().send)(
+                    CHANNEL_POLL_OBSERVER,
+                    {
+                        'type': TYPE_POLL_OBSERVER,
+                        'observer': self.id,
+                        'interval': self._meta.poll_interval,
+                    },
                 )
 
-                stop_observer = True
-        elif self._meta.change_detection == Options.CHANGE_DETECTION_POLL:
-            # Register poller.
-            observer.poll_interval = self._meta.poll_interval
-
-            async_to_sync(get_channel_layer().send)(
-                CHANNEL_POLL_OBSERVER,
-                {
-                    'type': TYPE_POLL_OBSERVER,
+            if emit_updates:
+                message = {
+                    'type': TYPE_ITEM_UPDATE,
                     'observer': self.id,
-                    'interval': self._meta.poll_interval,
-                },
-            )
-        else:
-            raise NotImplementedError(
-                "Change detection mechanism '{}' not implemented.".format(
-                    self._meta.change_detection
-                )
-            )
+                    'primary_key': self._meta.primary_key,
+                    'added': added,
+                    'changed': changed,
+                    'removed': removed,
+                }
 
-        # Update last evaluation time.
-        if not stop_observer:
-            observer.last_evaluation = timezone.now()
-            observer.save()
+                # Only generate notifications in case there were any changes.
+                if added or changed or removed:
+                    for subscriber in observer.subscribers.all():
+                        async_to_sync(get_channel_layer().group_send)(
+                            GROUP_SESSIONS.format(session_id=subscriber.session_id),
+                            message,
+                        )
 
-        # Log viewsets with too much output.
-        max_result_length = get_queryobserver_settings()['warnings'][
-            'max_result_length'
-        ]
-        if len(results) > max_result_length:
-            logger.warning(
-                "Observed viewset returned too many results ({})".format(
-                    self._get_logging_id()
-                ),
-                extra=self._get_logging_extra(results=len(results)),
-            )
+        except models.Observer.DoesNotExist:
+            # Observer removed, ignore evaluation
+            return
 
-        new_results = collections.OrderedDict()
-        for order, item in enumerate(results):
-            if not isinstance(item, dict):
-                raise ValueError(
-                    "Observable views must return a dictionary or a list of dictionaries!"
-                )
-
-            item = {'order': order, 'data': item}
-
-            try:
-                new_results[str(item['data'][self._meta.primary_key])] = item
-            except KeyError:
-                raise KeyError(
-                    "Observable view did not return primary key field '{}'!".format(
-                        self._meta.primary_key
-                    )
-                )
-
-        # Process difference between old results and new results.
-        added = []
-        changed = []
-        removed = []
-
-        new_ids = list(new_results.keys())
-        removed_qs = observer.items.exclude(primary_key__in=new_results.keys())
-        maybe_changed_qs = observer.items.filter(primary_key__in=new_results.keys())
-
-        # Removed items.
-        removed = list(removed_qs.values('order', 'data'))
-        removed_qs.delete()
-
-        # Defer unique ordering constraint before processing order updates.
-        # NOTE: The name of the constrait is generated by Django ORM.
-        with connection.cursor() as cursor:
-            cursor.execute(
-                "SET CONSTRAINTS rest_framework_reactive_item_observer_id_order_9b8adde6_uniq DEFERRED"
-            )
-
-        # Changed items.
-        for item_id, old_order, old_data in maybe_changed_qs.values_list(
-            'primary_key', 'order', 'data'
-        ):
-            new_item = new_results[item_id]
-            new_ids.remove(item_id)
-
-            if new_item['data'] != old_data:
-                changed.append(new_item)
-                observer.items.filter(primary_key=item_id).update(
-                    data=new_item['data'], order=new_item['order']
-                )
-            elif new_item['order'] != old_order:
-                # TODO: If only order has changed, don't transmit full data (needs frontend support).
-                changed.append(new_item)
-                observer.items.filter(primary_key=item_id).update(
-                    order=new_item['order']
-                )
-
-        # Added items.
-        for item_id in new_ids:
-            item = new_results[item_id]
-            added.append(item)
-            observer.items.create(
-                primary_key=item_id, order=item['order'], data=item['data']
-            )
-
-        # Check whether to emit results.
-        if observer.status == models.Observer.STATUS_OBSERVING:
-            message = {
-                'type': TYPE_ITEM_UPDATE,
-                'observer': self.id,
-                'primary_key': self._meta.primary_key,
-                'added': added,
-                'changed': changed,
-                'removed': removed,
-            }
-
-            # Stop an observer if there are no subscribers and we are in OBSERVING state.
-            if not observer.subscribers.exists():
-                stop_observer = True
-
-            # Only generate notifications in case there were any changes.
-            if added or changed or removed:
-                for subscriber in observer.subscribers.all():
-                    async_to_sync(get_channel_layer().group_send)(
-                        GROUP_SESSIONS.format(session_id=subscriber.session_id), message
-                    )
-
-            if return_emitted:
-                if stop_observer:
-                    observer.delete()
-
-                return (added, changed, removed)
-        elif not stop_observer:
-            # Switch observer status to OBSERVING.
-            observer.status = models.Observer.STATUS_OBSERVING
-            observer.save()
-
-        if stop_observer:
-            observer.delete()
-
-        if return_full:
-            return [item['data'] for item in new_results.values()]
+        if return_emitted:
+            return (added, changed, removed)
 
     def __eq__(self, other):
         return self.id == other.id
@@ -404,22 +458,6 @@ class QueryObserver(object):
         return '<QueryObserver: id={id} request={request}>'.format(
             id=self.id, request=repr(self._request)
         )
-
-
-def add_subscriber(session_id, observer_id):
-    """Add subscriber to the given observer.
-
-    :param session_id: Subscriber's session identifier
-    :param observer_id: Observer identifier
-    """
-    with transaction.atomic():
-        try:
-            observer = models.Observer.objects.get(pk=observer_id)
-        except models.Observer.DoesNotExist:
-            return
-
-        subscriber, _ = models.Subscriber.objects.get_or_create(session_id=session_id)
-        observer.subscribers.add(subscriber)
 
 
 def remove_subscriber(session_id, observer_id):
