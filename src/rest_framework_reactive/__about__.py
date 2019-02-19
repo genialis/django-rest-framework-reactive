@@ -14,11 +14,11 @@ except DistributionNotFound:
     # Package is not (yet) installed.
     pass
 
-__author__ = 'Genialis d.o.o.'
+__author__ = 'Genialis, Inc.'
 __email__ = 'dev-team@genialis.com'
 
 __license__ = 'Apache License (2.0)'
-__copyright__ = '2015-2018, ' + __author__
+__copyright__ = '2015-2019, ' + __author__
 
 __all__ = [
     "__title__",
