@@ -6,7 +6,7 @@ from ... import models
 class Command(BaseCommand):
     """Clear observer state."""
 
-    help = "Clear observer state."
+    help = "Clear observer state: delete all observers and subscribers."
 
     def handle(self, *args, **options):
         """Command handle."""
