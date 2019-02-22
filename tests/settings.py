@@ -93,7 +93,7 @@ CHANNEL_LAYERS = {'default': {'BACKEND': 'channels.layers.InMemoryChannelLayer'}
 ASGI_APPLICATION = 'rest_framework_reactive.routing.application'
 
 DJANGO_REST_FRAMEWORK_REACTIVE = {
-    # Set update batch delay to zero during tests as otherwise they can be delayed
+    # Set throttle rate to zero during tests as otherwise they can be delayed
     # and cause test timeouts.
-    'update_batch_delay': 0
+    'throttle_rate': 0
 }

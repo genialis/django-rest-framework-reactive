@@ -1,10 +1,13 @@
 from concurrent.futures import CancelledError
 
 import async_timeout
+import asyncio
 import pytest
+from unittest.mock import Mock, patch
 
 from django.conf.urls import url
-
+from django.core.cache import cache
+from django.test import override_settings
 from channels.db import database_sync_to_async
 from channels.testing import ApplicationCommunicator, WebsocketCommunicator
 from channels.routing import URLRouter
@@ -18,6 +21,8 @@ from rest_framework_reactive import (
 from rest_framework_reactive.consumers import (
     ClientConsumer,
     PollObserversConsumer,
+    throttle_cache_key,
+    ThrottleConsumer,
     WorkerConsumer,
 )
 from rest_framework_reactive.protocol import *
@@ -221,3 +226,112 @@ async def test_poll_observer_integration():
     # No other messages should be sent.
     assert await client.receive_nothing() is True
     await client.disconnect()
+
+
+@pytest.mark.asyncio
+async def test_throttle():
+    with override_settings(DJANGO_REST_FRAMEWORK_REACTIVE={'throttle_rate': 2}):
+        channel_layer = get_channel_layer()
+        throttle = ApplicationCommunicator(
+            ThrottleConsumer, {'type': 'channel', 'channel': CHANNEL_THROTTLE}
+        )
+
+        async with async_timeout.timeout(1):
+            await throttle.send_input({'type': TYPE_THROTTLE, 'observer': 'test'})
+
+        # Nothing should be received in the first second.
+        async with async_timeout.timeout(1):
+            try:
+                await channel_layer.receive(CHANNEL_WORKER_NOTIFY)
+                assert False
+            except CancelledError:
+                pass
+
+        async with async_timeout.timeout(2):
+            # Then after another second we should get a notification.
+            notify = await channel_layer.receive(CHANNEL_WORKER_NOTIFY)
+            assert notify['type'] == TYPE_EVALUATE_OBSERVER
+            assert notify['observer'] == 'test'
+
+
+@pytest.mark.django_db(transaction=True)
+@pytest.mark.asyncio
+async def test_throttle_observer():
+    with override_settings(DJANGO_REST_FRAMEWORK_REACTIVE={'throttle_rate': 2}):
+        channel_layer = get_channel_layer()
+        worker = ApplicationCommunicator(
+            WorkerConsumer, {'type': 'channel', 'channel': CHANNEL_WORKER_NOTIFY}
+        )
+
+        throttle = ApplicationCommunicator(
+            ThrottleConsumer, {'type': 'channel', 'channel': CHANNEL_THROTTLE}
+        )
+
+        @database_sync_to_async
+        def create_observer():
+            observer = QueryObserver(
+                create_request(views.ExampleItemViewSet, offset=0, limit=10)
+            )
+            items = observer.subscribe('test-session')
+            return observer.id
+
+        @database_sync_to_async
+        def get_last_evaluation(observer_id):
+            return observer_models.Observer.objects.get(id=observer_id).last_evaluation
+
+        def throttle_count(observer_id, value=None):
+            cache_key = throttle_cache_key(observer_id)
+            if value is None:
+                return cache.get(cache_key)
+            else:
+                return cache.set(cache_key, value)
+
+        observer_id = await create_observer()
+
+        # Test that observer is evaluated
+        async with async_timeout.timeout(1):
+            await worker.send_input(
+                {'type': TYPE_EVALUATE_OBSERVER, 'observer': observer_id}
+            )
+
+            # Nothing should be in the throttle worker
+            assert await throttle.receive_nothing()
+
+            # Get last evaluation time for later comparisson
+            last_evaluation = await get_last_evaluation(observer_id)
+
+            # Throttle count should be 1 (one process)
+            assert throttle_count(observer_id) == 1
+
+            # Ensure last_evaluated time change before the next test
+            await asyncio.sleep(0.001)
+
+            # Observer evaluation is delayed while another is evaluated
+            await worker.send_input(
+                {'type': TYPE_EVALUATE_OBSERVER, 'observer': observer_id}
+            )
+
+            # Delayed observer should be scheduled
+            notify = await channel_layer.receive(CHANNEL_THROTTLE)
+            assert notify['type'] == TYPE_THROTTLE
+            assert notify['observer'] == observer_id
+
+            # Throttle count should be 2 (two processes)
+            assert throttle_count(observer_id) == 2
+
+            # Observer should not be evaluated
+            assert last_evaluation == await get_last_evaluation(observer_id)
+
+            # Observer evaluation is discarded when delayed observer scheduled
+            await worker.send_input(
+                {'type': TYPE_EVALUATE_OBSERVER, 'observer': observer_id}
+            )
+
+            # Nothing should be in the throttle worker
+            assert await throttle.receive_nothing()
+
+            # Observer should not be evaluated
+            assert last_evaluation == await get_last_evaluation(observer_id)
+
+            # Throttle count should be 3 (three processes)
+            assert throttle_count(observer_id) == 3

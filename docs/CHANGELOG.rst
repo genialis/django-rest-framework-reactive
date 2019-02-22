@@ -9,6 +9,11 @@ All notable changes to this project are documented in this file.
 Unreleased
 ==========
 
+Added
+-----
+* Observers with the same ID are throttled. The default throttle rate is 2
+  seconds.
+
 Changed
 -------
 * **BACKWARD INCOMPATIBLE:** Ensure observers exist when subscribing. Subscribe

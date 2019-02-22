@@ -2,8 +2,13 @@ from django.conf.urls import url
 
 from channels.routing import ChannelNameRouter, ProtocolTypeRouter, URLRouter
 
-from .consumers import ClientConsumer, PollObserversConsumer, WorkerConsumer
-from .protocol import CHANNEL_POLL_OBSERVER, CHANNEL_WORKER_NOTIFY
+from .consumers import (
+    ClientConsumer,
+    PollObserversConsumer,
+    ThrottleConsumer,
+    WorkerConsumer,
+)
+from .protocol import CHANNEL_POLL_OBSERVER, CHANNEL_THROTTLE, CHANNEL_WORKER_NOTIFY
 
 application = ProtocolTypeRouter(
     {
@@ -19,6 +24,7 @@ application = ProtocolTypeRouter(
         'channel': ChannelNameRouter(
             {
                 CHANNEL_POLL_OBSERVER: PollObserversConsumer,
+                CHANNEL_THROTTLE: ThrottleConsumer,
                 CHANNEL_WORKER_NOTIFY: WorkerConsumer,
             }
         ),
