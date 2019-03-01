@@ -31,7 +31,7 @@ OBSERVABLE_OPTIONS_PREFIX = 'observable_'
 MAX_INTEGRITY_ERROR_RETRIES = 3
 
 
-class Options(object):
+class Options:
     """Query observer options."""
 
     # Valid change detection types.
@@ -70,7 +70,7 @@ class Options(object):
         )
 
 
-class QueryObserver(object):
+class QueryObserver:
     """Query observer.
 
     A query observer observes a specific viewset for changes and propagates these

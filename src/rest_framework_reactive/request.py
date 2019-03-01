@@ -1,7 +1,6 @@
 import hashlib
 
 from django.http import request as http_request
-from six import string_types, text_type
 
 # Observable query parameter name.
 OBSERVABLE_QUERY_PARAMETER = 'observe'
@@ -18,7 +17,7 @@ class Request(http_request.HttpRequest):
         :param request: The original API request
         """
 
-        super(Request, self).__init__()
+        super().__init__()
 
         self.viewset_class = viewset_class
         self.viewset_method = viewset_method
@@ -29,7 +28,7 @@ class Request(http_request.HttpRequest):
         self.method = request.method
         self.META = {}
         for key, value in request._request.META.items():
-            if isinstance(value, string_types):
+            if isinstance(value, str):
                 self.META[key] = value
         self.GET = request._request.GET.copy()
         if OBSERVABLE_QUERY_PARAMETER in self.GET:
@@ -57,7 +56,7 @@ class Request(http_request.HttpRequest):
             hasher.update(self.path_info.encode('utf8'))
             if self._force_auth_user is not None:
                 hasher.update(
-                    (text_type(self._force_auth_user.id) or 'anonymous').encode('utf8')
+                    (str(self._force_auth_user.id) or 'anonymous').encode('utf8')
                 )
             else:
                 hasher.update(b'anonymous')

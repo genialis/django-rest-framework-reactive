@@ -23,7 +23,7 @@ def intercept_as_sql(compiler, *args, **kwargs):
 compiler.SQLCompiler.as_sql = intercept_as_sql
 
 
-class QueryInterceptor(object):
+class QueryInterceptor:
     """Django ORM query interceptor."""
 
     def __init__(self):
