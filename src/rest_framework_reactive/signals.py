@@ -1,15 +1,14 @@
 import logging
 
-from django import dispatch
-from django.db import transaction
-from django.db.models import signals as model_signals
-
 from asgiref.sync import async_to_sync
 from channels.exceptions import ChannelFull
 from channels.layers import get_channel_layer
+from django import dispatch
+from django.db import transaction
+from django.db.models import signals as model_signals
 from django_priority_batch import PrioritizedBatcher
 
-from .models import Observer, Subscriber
+from .models import Observer
 from .protocol import *
 
 # Logger.
@@ -52,9 +51,9 @@ def notify_observers(table, kind, primary_key=None):
         """Send a notification to the given channel."""
         try:
             async_to_sync(get_channel_layer().send)(
-                CHANNEL_WORKER_NOTIFY,
+                CHANNEL_MAIN,
                 {
-                    'type': TYPE_ORM_NOTIFY_TABLE,
+                    'type': TYPE_ORM_NOTIFY,
                     'table': table,
                     'kind': kind,
                     'primary_key': str(primary_key),

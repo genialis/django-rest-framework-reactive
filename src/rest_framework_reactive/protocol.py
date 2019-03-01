@@ -1,22 +1,18 @@
-# Channel used for notifying workers from ORM signals.
-CHANNEL_WORKER_NOTIFY = 'rest_framework_reactive.worker'
-# Channel used for scheduling polling of observers.
-CHANNEL_POLL_OBSERVER = 'rest_framework_reactive.poll_observer'
-# Channel used for notifying workers from ORM signals.
-CHANNEL_THROTTLE = 'rest_framework_reactive.throttle'
+# Channel used for lightweight controller tasks.
+CHANNEL_MAIN = 'rest_framework_reactive.main'
+# Channel used for CPU-bound observers evaluation.
+CHANNEL_WORKER = 'rest_framework_reactive.worker'
 # Group used for individual sessions.
 GROUP_SESSIONS = 'rest_framework_reactive.session.{session_id}'
 
+# Message type for observer evaluation.
+TYPE_EVALUATE = 'observer.evaluate'
 # Message type for ORM table change notifications.
-TYPE_ORM_NOTIFY_TABLE = 'orm.notify_table'
-# Message type for evaluating an observer.
-TYPE_EVALUATE_OBSERVER = 'observer.evaluate'
+TYPE_ORM_NOTIFY = 'observer.orm_notify'
 # Message type for polling observable evaluation.
-TYPE_POLL_OBSERVER = 'poll.observer'
+TYPE_POLL = 'observer.poll'
 # Message type for observer item updates.
 TYPE_ITEM_UPDATE = 'observer.update'
-# Message type for throttling observer evaluation.
-TYPE_THROTTLE = 'delay.observer_evaluate'
 
 ORM_NOTIFY_KIND_CREATE = 'create'
 ORM_NOTIFY_KIND_UPDATE = 'update'

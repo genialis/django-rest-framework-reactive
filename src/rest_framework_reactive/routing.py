@@ -1,14 +1,8 @@
+from channels.routing import ChannelNameRouter, ProtocolTypeRouter, URLRouter
 from django.conf.urls import url
 
-from channels.routing import ChannelNameRouter, ProtocolTypeRouter, URLRouter
-
-from .consumers import (
-    ClientConsumer,
-    PollObserversConsumer,
-    ThrottleConsumer,
-    WorkerConsumer,
-)
-from .protocol import CHANNEL_POLL_OBSERVER, CHANNEL_THROTTLE, CHANNEL_WORKER_NOTIFY
+from .consumers import ClientConsumer, MainConsumer, WorkerConsumer
+from .protocol import CHANNEL_MAIN, CHANNEL_WORKER
 
 application = ProtocolTypeRouter(
     {
@@ -22,11 +16,7 @@ application = ProtocolTypeRouter(
         ),
         # Background worker consumers.
         'channel': ChannelNameRouter(
-            {
-                CHANNEL_POLL_OBSERVER: PollObserversConsumer,
-                CHANNEL_THROTTLE: ThrottleConsumer,
-                CHANNEL_WORKER_NOTIFY: WorkerConsumer,
-            }
+            {CHANNEL_MAIN: MainConsumer, CHANNEL_WORKER: WorkerConsumer}
         ),
     }
 )

@@ -1,34 +1,29 @@
+import asyncio
 from concurrent.futures import CancelledError
 
 import async_timeout
-import asyncio
 import pytest
-from unittest.mock import Mock, patch
-
+from channels.db import database_sync_to_async
+from channels.layers import get_channel_layer
+from channels.routing import URLRouter
+from channels.testing import ApplicationCommunicator, WebsocketCommunicator
 from django.conf.urls import url
 from django.core.cache import cache
 from django.test import override_settings
-from channels.db import database_sync_to_async
-from channels.testing import ApplicationCommunicator, WebsocketCommunicator
-from channels.routing import URLRouter
-from channels.layers import get_channel_layer
-from rest_framework import test as api_test, request as api_request
-
-from rest_framework_reactive import (
-    request as observer_request,
-    models as observer_models,
-)
-from rest_framework_reactive.consumers import (
-    ClientConsumer,
-    PollObserversConsumer,
-    throttle_cache_key,
-    ThrottleConsumer,
-    WorkerConsumer,
-)
-from rest_framework_reactive.protocol import *
-from rest_framework_reactive.observer import QueryObserver, remove_subscriber
+from rest_framework import request as api_request
+from rest_framework import test as api_test
 
 from drfr_test_app import models, views
+from rest_framework_reactive import models as observer_models
+from rest_framework_reactive import request as observer_request
+from rest_framework_reactive.consumers import (
+    ClientConsumer,
+    MainConsumer,
+    WorkerConsumer,
+    throttle_cache_key,
+)
+from rest_framework_reactive.observer import QueryObserver
+from rest_framework_reactive.protocol import *
 
 # Create test request factory.
 factory = api_test.APIRequestFactory()
@@ -58,8 +53,11 @@ async def test_worker_and_client():
     client_consumer = URLRouter([url(r'^ws/(?P<subscriber_id>.+)$', ClientConsumer)])
 
     client = WebsocketCommunicator(client_consumer, '/ws/test-session')
+    main = ApplicationCommunicator(
+        MainConsumer, {'type': 'channel', 'channel': CHANNEL_MAIN}
+    )
     worker = ApplicationCommunicator(
-        WorkerConsumer, {'type': 'channel', 'channel': CHANNEL_WORKER_NOTIFY}
+        WorkerConsumer, {'type': 'channel', 'channel': CHANNEL_WORKER}
     )
 
     # Connect client.
@@ -90,17 +88,17 @@ async def test_worker_and_client():
 
     async with async_timeout.timeout(1):
         # Check that ORM signal was generated.
-        notify = await channel_layer.receive(CHANNEL_WORKER_NOTIFY)
-        assert notify['type'] == TYPE_ORM_NOTIFY_TABLE
+        notify = await channel_layer.receive(CHANNEL_MAIN)
+        assert notify['type'] == TYPE_ORM_NOTIFY
         assert notify['kind'] == ORM_NOTIFY_KIND_CREATE
         assert notify['primary_key'] == str(primary_key)
 
         # Propagate notification to worker.
-        await worker.send_input(notify)
+        await main.send_input(notify)
 
         # Check that observer evaluation was requested.
-        notify = await channel_layer.receive(CHANNEL_WORKER_NOTIFY)
-        assert notify['type'] == TYPE_EVALUATE_OBSERVER
+        notify = await channel_layer.receive(CHANNEL_WORKER)
+        assert notify['type'] == TYPE_EVALUATE
         assert notify['observer'] == observer_id
 
         # Propagate notification to worker.
@@ -120,37 +118,33 @@ async def test_worker_and_client():
 
     async with async_timeout.timeout(1):
         # Run observer again and it should skip evaluation because there are no more subscribers.
-        await worker.send_input(
-            {'type': TYPE_EVALUATE_OBSERVER, 'observer': observer_id}
-        )
+        await worker.send_input({'type': TYPE_EVALUATE, 'observer': observer_id})
 
     assert await worker.receive_nothing() is True
 
 
 @pytest.mark.asyncio
 async def test_poll_observer():
-    poller = ApplicationCommunicator(
-        PollObserversConsumer, {'type': 'channel', 'channel': CHANNEL_POLL_OBSERVER}
+    main = ApplicationCommunicator(
+        MainConsumer, {'type': 'channel', 'channel': CHANNEL_MAIN}
     )
 
-    await poller.send_input(
-        {'type': TYPE_POLL_OBSERVER, 'observer': 'test', 'interval': 2}
-    )
+    await main.send_input({'type': TYPE_POLL, 'observer': 'test', 'interval': 2})
 
     channel_layer = get_channel_layer()
 
     # Nothing should be received in the first second.
     async with async_timeout.timeout(1):
         try:
-            await channel_layer.receive(CHANNEL_WORKER_NOTIFY)
+            await channel_layer.receive(CHANNEL_WORKER)
             assert False
         except CancelledError:
             pass
 
     async with async_timeout.timeout(2):
         # Then after another second we should get a notification.
-        notify = await channel_layer.receive(CHANNEL_WORKER_NOTIFY)
-        assert notify['type'] == TYPE_EVALUATE_OBSERVER
+        notify = await channel_layer.receive(CHANNEL_WORKER)
+        assert notify['type'] == TYPE_EVALUATE
         assert notify['observer'] == 'test'
 
 
@@ -160,11 +154,11 @@ async def test_poll_observer_integration():
     client_consumer = URLRouter([url(r'^ws/(?P<subscriber_id>.+)$', ClientConsumer)])
 
     client = WebsocketCommunicator(client_consumer, '/ws/test-session')
-    worker = ApplicationCommunicator(
-        WorkerConsumer, {'type': 'channel', 'channel': CHANNEL_WORKER_NOTIFY}
+    main = ApplicationCommunicator(
+        MainConsumer, {'type': 'channel', 'channel': CHANNEL_MAIN}
     )
-    poller = ApplicationCommunicator(
-        PollObserversConsumer, {'type': 'channel', 'channel': CHANNEL_POLL_OBSERVER}
+    worker = ApplicationCommunicator(
+        WorkerConsumer, {'type': 'channel', 'channel': CHANNEL_WORKER}
     )
 
     # Connect client.
@@ -187,32 +181,32 @@ async def test_poll_observer_integration():
 
     async with async_timeout.timeout(1):
         # Ensure that a notification message was sent to the poller.
-        notify = await channel_layer.receive(CHANNEL_POLL_OBSERVER)
-        assert notify['type'] == TYPE_POLL_OBSERVER
+        notify = await channel_layer.receive(CHANNEL_MAIN)
+        assert notify['type'] == TYPE_POLL
         assert notify['interval'] == 2
         assert notify['observer'] == observer_id
 
         # Dispatch notification to poller as our poller uses a dummy queue.
-        await poller.send_input(notify)
+        await main.send_input(notify)
 
     # Nothing should be received in the first second.
     async with async_timeout.timeout(1):
         try:
-            await channel_layer.receive(CHANNEL_WORKER_NOTIFY)
+            await channel_layer.receive(CHANNEL_WORKER)
             assert False
         except CancelledError:
             pass
 
     async with async_timeout.timeout(2):
         # Then after another second we should get a notification.
-        notify = await channel_layer.receive(CHANNEL_WORKER_NOTIFY)
+        notify = await channel_layer.receive(CHANNEL_WORKER)
 
         # Dispatch notification to worker.
         await worker.send_input(notify)
 
         # Ensure another notification message was sent to the poller.
-        notify = await channel_layer.receive(CHANNEL_POLL_OBSERVER)
-        assert notify['type'] == TYPE_POLL_OBSERVER
+        notify = await channel_layer.receive(CHANNEL_MAIN)
+        assert notify['type'] == TYPE_POLL
         assert notify['interval'] == 2
         assert notify['observer'] == observer_id
 
@@ -228,43 +222,16 @@ async def test_poll_observer_integration():
     await client.disconnect()
 
 
-@pytest.mark.asyncio
-async def test_throttle():
-    with override_settings(DJANGO_REST_FRAMEWORK_REACTIVE={'throttle_rate': 2}):
-        channel_layer = get_channel_layer()
-        throttle = ApplicationCommunicator(
-            ThrottleConsumer, {'type': 'channel', 'channel': CHANNEL_THROTTLE}
-        )
-
-        async with async_timeout.timeout(1):
-            await throttle.send_input({'type': TYPE_THROTTLE, 'observer': 'test'})
-
-        # Nothing should be received in the first second.
-        async with async_timeout.timeout(1):
-            try:
-                await channel_layer.receive(CHANNEL_WORKER_NOTIFY)
-                assert False
-            except CancelledError:
-                pass
-
-        async with async_timeout.timeout(2):
-            # Then after another second we should get a notification.
-            notify = await channel_layer.receive(CHANNEL_WORKER_NOTIFY)
-            assert notify['type'] == TYPE_EVALUATE_OBSERVER
-            assert notify['observer'] == 'test'
-
-
 @pytest.mark.django_db(transaction=True)
 @pytest.mark.asyncio
 async def test_throttle_observer():
     with override_settings(DJANGO_REST_FRAMEWORK_REACTIVE={'throttle_rate': 2}):
         channel_layer = get_channel_layer()
-        worker = ApplicationCommunicator(
-            WorkerConsumer, {'type': 'channel', 'channel': CHANNEL_WORKER_NOTIFY}
+        main = ApplicationCommunicator(
+            MainConsumer, {'type': 'channel', 'channel': CHANNEL_MAIN}
         )
-
-        throttle = ApplicationCommunicator(
-            ThrottleConsumer, {'type': 'channel', 'channel': CHANNEL_THROTTLE}
+        worker = ApplicationCommunicator(
+            WorkerConsumer, {'type': 'channel', 'channel': CHANNEL_WORKER}
         )
 
         @database_sync_to_async
@@ -290,12 +257,10 @@ async def test_throttle_observer():
 
         # Test that observer is evaluated
         async with async_timeout.timeout(1):
-            await worker.send_input(
-                {'type': TYPE_EVALUATE_OBSERVER, 'observer': observer_id}
-            )
+            await worker.send_input({'type': TYPE_EVALUATE, 'observer': observer_id})
 
-            # Nothing should be in the throttle worker
-            assert await throttle.receive_nothing()
+            # Nothing should be in the main worker
+            assert await main.receive_nothing()
 
             # Get last evaluation time for later comparisson
             last_evaluation = await get_last_evaluation(observer_id)
@@ -307,13 +272,11 @@ async def test_throttle_observer():
             await asyncio.sleep(0.001)
 
             # Observer evaluation is delayed while another is evaluated
-            await worker.send_input(
-                {'type': TYPE_EVALUATE_OBSERVER, 'observer': observer_id}
-            )
+            await worker.send_input({'type': TYPE_EVALUATE, 'observer': observer_id})
 
             # Delayed observer should be scheduled
-            notify = await channel_layer.receive(CHANNEL_THROTTLE)
-            assert notify['type'] == TYPE_THROTTLE
+            notify = await channel_layer.receive(CHANNEL_MAIN)
+            assert notify['type'] == TYPE_POLL
             assert notify['observer'] == observer_id
 
             # Throttle count should be 2 (two processes)
@@ -323,12 +286,10 @@ async def test_throttle_observer():
             assert last_evaluation == await get_last_evaluation(observer_id)
 
             # Observer evaluation is discarded when delayed observer scheduled
-            await worker.send_input(
-                {'type': TYPE_EVALUATE_OBSERVER, 'observer': observer_id}
-            )
+            await worker.send_input({'type': TYPE_EVALUATE, 'observer': observer_id})
 
-            # Nothing should be in the throttle worker
-            assert await throttle.receive_nothing()
+            # Nothing should be in the main worker
+            assert await main.receive_nothing()
 
             # Observer should not be evaluated
             assert last_evaluation == await get_last_evaluation(observer_id)

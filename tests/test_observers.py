@@ -1,18 +1,15 @@
-import json
 import pickle
 
 from django import test
 from django.contrib.auth import models as auth_models
-
 from guardian import shortcuts
-from rest_framework import test as api_test, request as api_request
-
-from rest_framework_reactive import models as observer_models
-from rest_framework_reactive import request as observer_request
-
-from rest_framework_reactive.observer import remove_subscriber, QueryObserver
+from rest_framework import request as api_request
+from rest_framework import test as api_test
 
 from drfr_test_app import models, views
+from rest_framework_reactive import models as observer_models
+from rest_framework_reactive import request as observer_request
+from rest_framework_reactive.observer import QueryObserver, remove_subscriber
 
 # Create test request factory.
 factory = api_test.APIRequestFactory()
@@ -32,7 +29,7 @@ class QueryObserversTestCase(test.TestCase):
         observer = QueryObserver(request(views.PaginatedViewSet, offset=0, limit=10))
         items = observer.subscribe('test-session')
 
-        self.assertEquals(len(items), 0)
+        self.assertEqual(len(items), 0)
 
         items = []
         for index in range(20):
@@ -42,17 +39,17 @@ class QueryObserversTestCase(test.TestCase):
 
         # Evaluate the observer again (in reality this would be done automatically, triggered by signals
         # from Django ORM).
-        added, changed, removed = observer.evaluate(return_emitted=True)
+        added, changed, removed = observer._evaluate()
 
-        self.assertEquals(len(added), 10)
+        self.assertEqual(len(added), 10)
         expected_serialized_item = {
             'id': items[0].pk,
             'name': items[0].name,
             'enabled': items[0].enabled,
         }
-        self.assertEquals(added[0]['data'], expected_serialized_item)
-        self.assertEquals(len(changed), 0)
-        self.assertEquals(len(removed), 0)
+        self.assertEqual(added[0]['data'], expected_serialized_item)
+        self.assertEqual(len(changed), 0)
+        self.assertEqual(len(removed), 0)
 
     def test_item_serialization(self):
         item = models.ExampleItem.objects.create(name='Example', enabled=True)
@@ -73,11 +70,11 @@ class QueryObserversTestCase(test.TestCase):
         observer = QueryObserver(request(views.ExampleItemViewSet))
         items = observer.subscribe('test-session')
 
-        self.assertEquals(
+        self.assertEqual(
             observer.id,
             'fa87c86f1e032942b699e9902ac38ca232ce3566724b3891914c80083b676ed4',
         )
-        self.assertEquals(len(items), 0)
+        self.assertEqual(len(items), 0)
 
         # Add an item into the database.
         item = models.ExampleItem()
@@ -93,28 +90,28 @@ class QueryObserversTestCase(test.TestCase):
 
         # Evaluate the observer again (in reality this would be done automatically, triggered by signals
         # from Django ORM).
-        added, changed, removed = observer.evaluate(return_emitted=True)
+        added, changed, removed = observer._evaluate()
 
-        self.assertEquals(len(added), 1)
+        self.assertEqual(len(added), 1)
         expected_serialized_item = {
             'id': item.pk,
             'name': item.name,
             'enabled': item.enabled,
         }
-        self.assertEquals(added[0]['data'], expected_serialized_item)
-        self.assertEquals(len(changed), 0)
-        self.assertEquals(len(removed), 0)
+        self.assertEqual(added[0]['data'], expected_serialized_item)
+        self.assertEqual(len(changed), 0)
+        self.assertEqual(len(removed), 0)
 
         # Change the existing item.
         item.enabled = False
         expected_serialized_item['enabled'] = False
         item.save()
 
-        added, changed, removed = observer.evaluate(return_emitted=True)
-        self.assertEquals(len(added), 0)
-        self.assertEquals(len(changed), 1)
-        self.assertEquals(changed[0]['data'], expected_serialized_item)
-        self.assertEquals(len(removed), 0)
+        added, changed, removed = observer._evaluate()
+        self.assertEqual(len(added), 0)
+        self.assertEqual(len(changed), 1)
+        self.assertEqual(changed[0]['data'], expected_serialized_item)
+        self.assertEqual(len(removed), 0)
 
         # Remove the first item.
         item.delete()
@@ -141,29 +138,29 @@ class QueryObserversTestCase(test.TestCase):
             item3,
         )
 
-        added, changed, removed = observer.evaluate(return_emitted=True)
-        self.assertEquals(len(added), 2)
-        self.assertEquals(
+        added, changed, removed = observer._evaluate()
+        self.assertEqual(len(added), 2)
+        self.assertEqual(
             added[0]['data'],
             {'id': item2.pk, 'name': item2.name, 'enabled': item2.enabled},
         )
-        self.assertEquals(
+        self.assertEqual(
             added[1]['data'],
             {'id': item3.pk, 'name': item3.name, 'enabled': item3.enabled},
         )
-        self.assertEquals(len(changed), 0)
-        self.assertEquals(len(removed), 1)
-        self.assertEquals(removed[0]['data'], expected_serialized_item)
+        self.assertEqual(len(changed), 0)
+        self.assertEqual(len(removed), 1)
+        self.assertEqual(removed[0]['data'], expected_serialized_item)
 
     def test_conditions(self):
         observer = QueryObserver(request(views.ExampleItemViewSet, enabled=True))
         items = observer.subscribe('test-session')
 
-        self.assertEquals(
+        self.assertEqual(
             observer.id,
             '5333b85599fd24ed4e2f7eeaefb599cbbd39894b437e9b9d3b80d5d21639b4bb',
         )
-        self.assertEquals(len(items), 0)
+        self.assertEqual(len(items), 0)
 
         item = models.ExampleItem()
         item.name = 'Example'
@@ -176,24 +173,24 @@ class QueryObserversTestCase(test.TestCase):
             item,
         )
 
-        added, changed, removed = observer.evaluate(return_emitted=True)
+        added, changed, removed = observer._evaluate()
 
-        self.assertEquals(len(added), 0)
-        self.assertEquals(len(changed), 0)
-        self.assertEquals(len(removed), 0)
+        self.assertEqual(len(added), 0)
+        self.assertEqual(len(changed), 0)
+        self.assertEqual(len(removed), 0)
 
         item.enabled = True
         item.save()
 
-        added, changed, removed = observer.evaluate(return_emitted=True)
+        added, changed, removed = observer._evaluate()
 
-        self.assertEquals(len(added), 1)
-        self.assertEquals(
+        self.assertEqual(len(added), 1)
+        self.assertEqual(
             added[0]['data'],
             {'id': item.pk, 'name': item.name, 'enabled': item.enabled},
         )
-        self.assertEquals(len(changed), 0)
-        self.assertEquals(len(removed), 0)
+        self.assertEqual(len(changed), 0)
+        self.assertEqual(len(removed), 0)
 
     def test_joins(self):
         # Create some items so that we get a valid query (otherwise the query would be empty as django-guardian
@@ -222,11 +219,11 @@ class QueryObserversTestCase(test.TestCase):
         )
         items = observer.subscribe('test-session')
 
-        self.assertEquals(
+        self.assertEqual(
             observer.id,
             '92b1698976bf1e04d155f9c60ac74c054ef872f547a59d771fc3c046998bbba8',
         )
-        self.assertEquals(len(items), 0)
+        self.assertEqual(len(items), 0)
 
         observer_state = observer_models.Observer.objects.get(pk=observer.id)
         dependencies = observer_state.dependencies.all().values_list('table', flat=True)
@@ -262,7 +259,7 @@ class QueryObserversTestCase(test.TestCase):
         observer = QueryObserver(request(views.ExampleItemViewSet, ordering='name'))
         items = observer.subscribe('test-session')
 
-        self.assertEquals(len(items), 0)
+        self.assertEqual(len(items), 0)
 
         item = models.ExampleItem()
         item.name = 'D'
@@ -275,16 +272,16 @@ class QueryObserversTestCase(test.TestCase):
             item,
         )
 
-        added, changed, removed = observer.evaluate(return_emitted=True)
+        added, changed, removed = observer._evaluate()
 
-        self.assertEquals(len(added), 1)
-        self.assertEquals(
+        self.assertEqual(len(added), 1)
+        self.assertEqual(
             added[0]['data'],
             {'id': item.pk, 'name': item.name, 'enabled': item.enabled},
         )
-        self.assertEquals(added[0]['order'], 0)
-        self.assertEquals(len(changed), 0)
-        self.assertEquals(len(removed), 0)
+        self.assertEqual(added[0]['order'], 0)
+        self.assertEqual(len(changed), 0)
+        self.assertEqual(len(removed), 0)
 
         item2 = models.ExampleItem()
         item2.name = 'A'
@@ -297,22 +294,22 @@ class QueryObserversTestCase(test.TestCase):
             item2,
         )
 
-        added, changed, removed = observer.evaluate(return_emitted=True)
+        added, changed, removed = observer._evaluate()
 
-        self.assertEquals(len(added), 1)
-        self.assertEquals(
+        self.assertEqual(len(added), 1)
+        self.assertEqual(
             added[0]['data'],
             {'id': item2.pk, 'name': item2.name, 'enabled': item2.enabled},
         )
-        self.assertEquals(added[0]['order'], 0)
+        self.assertEqual(added[0]['order'], 0)
         # Check that the first item has changed, because its order has changed.
-        self.assertEquals(len(changed), 1)
-        self.assertEquals(
+        self.assertEqual(len(changed), 1)
+        self.assertEqual(
             changed[0]['data'],
             {'id': item.pk, 'name': item.name, 'enabled': item.enabled},
         )
-        self.assertEquals(changed[0]['order'], 1)
-        self.assertEquals(len(removed), 0)
+        self.assertEqual(changed[0]['order'], 1)
+        self.assertEqual(len(removed), 0)
 
         item3 = models.ExampleItem()
         item3.name = 'C'
@@ -325,48 +322,48 @@ class QueryObserversTestCase(test.TestCase):
             item3,
         )
 
-        added, changed, removed = observer.evaluate(return_emitted=True)
-        self.assertEquals(len(added), 1)
-        self.assertEquals(
+        added, changed, removed = observer._evaluate()
+        self.assertEqual(len(added), 1)
+        self.assertEqual(
             added[0]['data'],
             {'id': item3.pk, 'name': item3.name, 'enabled': item3.enabled},
         )
-        self.assertEquals(added[0]['order'], 1)
-        self.assertEquals(len(changed), 1)
-        self.assertEquals(
+        self.assertEqual(added[0]['order'], 1)
+        self.assertEqual(len(changed), 1)
+        self.assertEqual(
             changed[0]['data'],
             {'id': item.pk, 'name': item.name, 'enabled': item.enabled},
         )
-        self.assertEquals(changed[0]['order'], 2)
-        self.assertEquals(len(removed), 0)
+        self.assertEqual(changed[0]['order'], 2)
+        self.assertEqual(len(removed), 0)
 
         # Check order change between two existing items.
 
         item.name = 'B'
         item.save()
 
-        added, changed, removed = observer.evaluate(return_emitted=True)
+        added, changed, removed = observer._evaluate()
 
-        self.assertEquals(len(added), 0)
-        self.assertEquals(len(changed), 2)
-        self.assertEquals(
+        self.assertEqual(len(added), 0)
+        self.assertEqual(len(changed), 2)
+        self.assertEqual(
             changed[0]['data'],
             {'id': item3.pk, 'name': item3.name, 'enabled': item3.enabled},
         )
-        self.assertEquals(changed[0]['order'], 2)
-        self.assertEquals(
+        self.assertEqual(changed[0]['order'], 2)
+        self.assertEqual(
             changed[1]['data'],
             {'id': item.pk, 'name': item.name, 'enabled': item.enabled},
         )
-        self.assertEquals(changed[1]['order'], 1)
-        self.assertEquals(len(removed), 0)
+        self.assertEqual(changed[1]['order'], 1)
+        self.assertEqual(len(removed), 0)
 
     def test_no_dependencies(self):
         observer = QueryObserver(request(views.NoDependenciesViewSet))
         items = observer.subscribe('test-session')
 
         # Observer should not be created because there are no dependencies.
-        self.assertEquals(len(items), 1)
+        self.assertEqual(len(items), 1)
         self.assertFalse(observer_models.Observer.objects.exists())
 
     def test_remove_subscriber(self):
@@ -376,21 +373,21 @@ class QueryObserversTestCase(test.TestCase):
         items = query_observer.subscribe('test-session')
         observer = observer_models.Observer.objects.get(id=query_observer.id)
 
-        self.assertEquals(observer_models.Observer.objects.count(), 1)
-        self.assertEquals(observer.subscribers.count(), 1)
+        self.assertEqual(observer_models.Observer.objects.count(), 1)
+        self.assertEqual(observer.subscribers.count(), 1)
 
         # Simulate closing a WebSocket.
         # This removes the subscriber but the observer remains.
         remove_subscriber('test-session', observer.id)
-        self.assertEquals(observer_models.Observer.objects.count(), 1)
-        self.assertEquals(observer.subscribers.count(), 0)
+        self.assertEqual(observer_models.Observer.objects.count(), 1)
+        self.assertEqual(observer.subscribers.count(), 0)
 
         # Simulate opening a WebSocket again.
         # This should add a subscriber to existing observer.
         query_observer = QueryObserver(request(views.ExampleItemViewSet))
         items = query_observer.subscribe('test-session')
-        self.assertEquals(observer_models.Subscriber.objects.count(), 1)
-        self.assertEquals(observer.subscribers.count(), 1)
+        self.assertEqual(observer_models.Subscriber.objects.count(), 1)
+        self.assertEqual(observer.subscribers.count(), 1)
 
 
 class QueryObserversTransactionTestCase(test.TransactionTestCase):
@@ -400,28 +397,28 @@ class QueryObserversTransactionTestCase(test.TransactionTestCase):
 
         # Subscribe new subscriber to new observer.
         observer.subscribe('test-session')
-        self.assertEquals(observer_qs.count(), 1)
-        self.assertEquals(observer_qs.first().subscribers.count(), 1)
+        self.assertEqual(observer_qs.count(), 1)
+        self.assertEqual(observer_qs.first().subscribers.count(), 1)
 
         # Subscribe new subscriber to existing observer.
         observer.subscribe('test-session2')
-        self.assertEquals(observer_qs.count(), 1)
-        self.assertEquals(observer_qs.first().subscribers.count(), 2)
+        self.assertEqual(observer_qs.count(), 1)
+        self.assertEqual(observer_qs.first().subscribers.count(), 2)
 
         # Subscribe existing subscriber to new observer.
         observer_qs.all().delete()
-        self.assertEquals(observer_qs.count(), 0)
-        self.assertEquals(observer_models.Subscriber.objects.count(), 2)
+        self.assertEqual(observer_qs.count(), 0)
+        self.assertEqual(observer_models.Subscriber.objects.count(), 2)
         observer.subscribe('test-session')
-        self.assertEquals(observer_qs.count(), 1)
-        self.assertEquals(observer_qs.first().subscribers.count(), 1)
+        self.assertEqual(observer_qs.count(), 1)
+        self.assertEqual(observer_qs.first().subscribers.count(), 1)
 
         # Subscribe existing subscriber to existing observer.
         # Note that when a subscriber is already subscribed to the observer,
         # we should ignore duplicate key violation.
         observer.subscribe('test-session')
-        self.assertEquals(observer_qs.count(), 1)
-        self.assertEquals(observer_qs.first().subscribers.count(), 1)
+        self.assertEqual(observer_qs.count(), 1)
+        self.assertEqual(observer_qs.first().subscribers.count(), 1)
 
         # Test that custom SQL query in subscribe serializes the request
         # string the same as Django create.
@@ -430,6 +427,6 @@ class QueryObserversTransactionTestCase(test.TransactionTestCase):
             id='request-comparisson', request=pickle.dumps(observer._request)
         )
 
-        self.assertEquals(
+        self.assertEqual(
             bytes(observer_obj.request), bytes(observer_with_same_request.request)
         )

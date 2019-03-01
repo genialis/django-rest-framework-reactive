@@ -1,21 +1,16 @@
 import collections
-import pickle
-import json
 import logging
-import sys
+import pickle
 import time
 
-import six
-
+from asgiref.sync import async_to_sync
+from channels.db import database_sync_to_async
+from channels.layers import get_channel_layer
 from django.core import exceptions as django_exceptions
-from django.db import connection, transaction, IntegrityError
+from django.db import IntegrityError, connection, transaction
 from django.http import Http404
 from django.utils import timezone
-
 from rest_framework import request as api_request
-
-from asgiref.sync import async_to_sync
-from channels.layers import get_channel_layer
 
 from . import exceptions, models
 from .connection import get_queryobserver_settings
@@ -235,8 +230,18 @@ class QueryObserver:
                 # If no dependencies, the observer will not be triggered.
                 if not tables:
                     self._warning("Push observer without dependencies")
+            elif self._meta.change_detection == Options.CHANGE_DETECTION_POLL:
+                # Register poller.
+                async_to_sync(get_channel_layer().send)(
+                    CHANNEL_MAIN,
+                    {
+                        'type': TYPE_POLL,
+                        'observer': self.id,
+                        'interval': self._meta.poll_interval,
+                    },
+                )
 
-            self._evaluate(viewset_results, emit_updates=False)
+            self._evaluate(viewset_results)
 
         except Exception:
             logger.exception(
@@ -248,17 +253,32 @@ class QueryObserver:
 
         return viewset_results
 
-    def evaluate(self, return_emitted=False):
+    async def evaluate(self):
         """Evaluate the query observer.
 
         :param return_emitted: True if the emitted diffs should be returned (testing only)
         """
+
+        @database_sync_to_async
+        def remove_subscribers():
+            models.Observer.subscribers.through.objects.filter(
+                observer_id=self.id
+            ).delete()
+
+        @database_sync_to_async
+        def get_subscriber_sessions():
+            return list(
+                models.Observer.subscribers.through.objects.filter(observer_id=self.id)
+                .distinct('subscriber_id')
+                .values_list('subscriber_id', flat=True)
+            )
+
         try:
             settings = get_queryobserver_settings()
 
             start = time.time()
             # Evaluate the observer
-            emitted_results = self._evaluate(return_emitted=return_emitted)
+            added, changed, removed = await database_sync_to_async(self._evaluate)()
             duration = time.time() - start
 
             # Log slow observers.
@@ -273,9 +293,34 @@ class QueryObserver:
                     ),
                     extra=self._get_logging_extra(duration=duration),
                 )
-                observer.subscribers.all().delete()
+                await remove_subscribers()
 
-            return emitted_results
+            if self._meta.change_detection == Options.CHANGE_DETECTION_POLL:
+                # Register poller.
+                await get_channel_layer().send(
+                    CHANNEL_MAIN,
+                    {
+                        'type': TYPE_POLL,
+                        'observer': self.id,
+                        'interval': self._meta.poll_interval,
+                    },
+                )
+
+            message = {
+                'type': TYPE_ITEM_UPDATE,
+                'observer': self.id,
+                'primary_key': self._meta.primary_key,
+                'added': added,
+                'changed': changed,
+                'removed': removed,
+            }
+
+            # Only generate notifications in case there were any changes.
+            if added or changed or removed:
+                for session_id in await get_subscriber_sessions():
+                    await get_channel_layer().group_send(
+                        GROUP_SESSIONS.format(session_id=session_id), message
+                    )
 
         except Exception:
             logger.exception(
@@ -319,12 +364,10 @@ class QueryObserver:
 
         return results
 
-    def _evaluate(self, viewset_results=None, emit_updates=True, return_emitted=False):
+    def _evaluate(self, viewset_results=None):
         """Evaluate query observer.
 
         :param viewset_results: Objects returned by the viewset query
-        :param emit_updates: Send changes to subscribers
-        :param return_emitted: True if the emitted diffs should be returned (testing only)
         """
         if viewset_results is None:
             viewset_results = self._viewset_results()
@@ -333,7 +376,7 @@ class QueryObserver:
             observer = models.Observer.objects.get(id=self.id)
             # Do not evaluate the observer if there are no subscribers
             if observer.subscribers.count() == 0:
-                return
+                return (None, None, None)
 
             # Update last evaluation time.
             models.Observer.objects.filter(id=self.id).update(
@@ -398,7 +441,8 @@ class QueryObserver:
                             data=new_item['data'], order=new_item['order']
                         )
                     elif new_item['order'] != old_order:
-                        # TODO: If only order has changed, don't transmit full data (needs frontend support).
+                        # TODO: If only order has changed, don't transmit
+                        # full data (needs frontend support).
                         changed.append(new_item)
                         observer.items.filter(primary_key=item_id).update(
                             order=new_item['order']
@@ -412,41 +456,11 @@ class QueryObserver:
                         primary_key=item_id, order=item['order'], data=item['data']
                     )
 
-            if self._meta.change_detection == Options.CHANGE_DETECTION_POLL:
-                # Register poller.
-                async_to_sync(get_channel_layer().send)(
-                    CHANNEL_POLL_OBSERVER,
-                    {
-                        'type': TYPE_POLL_OBSERVER,
-                        'observer': self.id,
-                        'interval': self._meta.poll_interval,
-                    },
-                )
-
-            if emit_updates:
-                message = {
-                    'type': TYPE_ITEM_UPDATE,
-                    'observer': self.id,
-                    'primary_key': self._meta.primary_key,
-                    'added': added,
-                    'changed': changed,
-                    'removed': removed,
-                }
-
-                # Only generate notifications in case there were any changes.
-                if added or changed or removed:
-                    for subscriber in observer.subscribers.all():
-                        async_to_sync(get_channel_layer().group_send)(
-                            GROUP_SESSIONS.format(session_id=subscriber.session_id),
-                            message,
-                        )
+            return (added, changed, removed)
 
         except models.Observer.DoesNotExist:
             # Observer removed, ignore evaluation
-            return
-
-        if return_emitted:
-            return (added, changed, removed)
+            return (None, None, None)
 
     def __eq__(self, other):
         return self.id == other.id
