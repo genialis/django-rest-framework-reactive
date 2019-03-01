@@ -1,8 +1,7 @@
 import hashlib
 
-from six import string_types, text_type
-
 from django.http import request as http_request
+from six import string_types, text_type
 
 # Observable query parameter name.
 OBSERVABLE_QUERY_PARAMETER = 'observe'

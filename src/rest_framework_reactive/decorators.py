@@ -1,10 +1,9 @@
 import inspect
 
-from rest_framework import response, viewsets
+from rest_framework import response
 
-from django.db import transaction
-
-from . import observer, request as observer_request
+from . import observer
+from . import request as observer_request
 
 
 def observable(method_or_viewset):

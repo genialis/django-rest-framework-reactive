@@ -1,4 +1,4 @@
-from rest_framework import views, response
+from rest_framework import response, views
 
 from . import observer
 
