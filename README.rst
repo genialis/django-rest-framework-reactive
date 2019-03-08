@@ -83,8 +83,8 @@ Configure your Django Channels ``routing.py`` to include the required paths:
 
     from channels.routing import ChannelNameRouter, ProtocolTypeRouter, URLRouter
 
-    from rest_framework_reactive.consumers import ClientConsumer, PollObserversConsumer, WorkerConsumer
-    from rest_framework_reactive.protocol import CHANNEL_POLL_OBSERVER, CHANNEL_WORKER_NOTIFY
+    from rest_framework_reactive.consumers import ClientConsumer, MainConsumer, WorkerConsumer
+    from rest_framework_reactive.protocol import CHANNEL_MAIN, CHANNEL_WORKER
 
     application = ProtocolTypeRouter({
         # Client-facing consumers.
@@ -96,8 +96,8 @@ Configure your Django Channels ``routing.py`` to include the required paths:
 
         # Background worker consumers.
         'channel': ChannelNameRouter({
-            CHANNEL_POLL_OBSERVER: PollObserversConsumer,
-            CHANNEL_WORKER_NOTIFY: WorkerConsumer,
+            CHANNEL_MAIN: MainConsumer,
+            CHANNEL_WORKER: WorkerConsumer,
         })
     })
 
@@ -119,4 +119,4 @@ separate observer worker process (or multiple of them). You may start it by runn
 
 .. code::
 
-   python manage.py runworker rest_framework_reactive.worker rest_framework_reactive.poll_observer
+   python manage.py runworker rest_framework_reactive.main rest_framework_reactive.worker
