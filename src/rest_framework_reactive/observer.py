@@ -14,7 +14,6 @@ from rest_framework import request as api_request
 
 from . import exceptions, models
 from .connection import get_queryobserver_settings
-from .interceptor import QueryInterceptor
 from .protocol import *
 
 # Logger.
@@ -126,10 +125,11 @@ class QueryObserver:
             extra=self._get_logging_extra(duration=duration, results=results),
         )
 
-    def subscribe(self, session_id):
+    def subscribe(self, session_id, dependencies=None):
         """Initialize observer and register subscriber.
 
         :param session_id: Subscriber's session identifier
+        :param dependencies: List of ORM to register as dependencies for orm_notify
         """
         try:
             change_detection = self._meta.change_detection
@@ -143,13 +143,7 @@ class QueryObserver:
                     )
                 )
 
-            tables = set()
-            with QueryInterceptor().intercept(tables):
-                viewset_results = self._viewset_results()
-
-            if not tables and change_detection == Options.CHANGE_DETECTION_PUSH:
-                self._warning("Will not create PUSH observer without dependencies")
-                return viewset_results
+            viewset_results = self._viewset_results()
 
             poll_interval = (
                 self._meta.poll_interval
@@ -216,6 +210,11 @@ class QueryObserver:
             # Determine who should notify us based on the configured change
             # detection mechanism.
             if change_detection == Options.CHANGE_DETECTION_PUSH:
+                if dependencies:
+                    tables = [model._meta.db_table for model in dependencies]
+                else:
+                    tables = [self._viewset.get_queryset().model._meta.db_table]
+
                 # Register table dependencies for push observables.
                 for table in tables:
                     try:
@@ -227,9 +226,6 @@ class QueryObserver:
                         # were created.
                         return viewset_results
 
-                # If no dependencies, the observer will not be triggered.
-                if not tables:
-                    self._warning("Push observer without dependencies")
             elif self._meta.change_detection == Options.CHANGE_DETECTION_POLL:
                 # Register poller.
                 async_to_sync(get_channel_layer().send)(

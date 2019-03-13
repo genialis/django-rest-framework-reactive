@@ -217,7 +217,9 @@ class QueryObserversTestCase(test.TestCase):
         observer = QueryObserver(
             request(views.ExampleSubItemViewSet, parent__enabled=True)
         )
-        items = observer.subscribe('test-session')
+        items = observer.subscribe(
+            'test-session', dependencies=[models.ExampleSubItem, models.ExampleItem]
+        )
 
         self.assertEqual(
             observer.id,
@@ -248,7 +250,10 @@ class QueryObserversTestCase(test.TestCase):
         observer = QueryObserver(
             request(views.AggregationTestViewSet, items=[m2m_item.pk])
         )
-        observer.subscribe('test-session')
+        observer.subscribe(
+            'test-session',
+            dependencies=[models.ExampleItem, models.ExampleM2MItem.items.through],
+        )
 
         # There should be a dependency on the intermediate table.
         observer_state = observer_models.Observer.objects.get(pk=observer.id)
@@ -362,9 +367,9 @@ class QueryObserversTestCase(test.TestCase):
         observer = QueryObserver(request(views.NoDependenciesViewSet))
         items = observer.subscribe('test-session')
 
-        # Observer should not be created because there are no dependencies.
+        # Observer is created even when there are no dependencies.
         self.assertEqual(len(items), 1)
-        self.assertFalse(observer_models.Observer.objects.exists())
+        self.assertTrue(observer_models.Observer.objects.exists())
 
     def test_remove_subscriber(self):
         # Simulate opening a WebSocket.

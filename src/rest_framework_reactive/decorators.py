@@ -6,7 +6,9 @@ from . import observer
 from . import request as observer_request
 
 
-def observable(_method_or_viewset=None, poll_interval=None, primary_key=None):
+def observable(
+    _method_or_viewset=None, poll_interval=None, primary_key=None, dependencies=None
+):
     """Make ViewSet or ViewSet method observable.
 
     Decorating a ViewSet class is the same as decorating its `list` method.
@@ -21,8 +23,13 @@ def observable(_method_or_viewset=None, poll_interval=None, primary_key=None):
 
     :param poll_interval: Configure given observable as a polling observable
     :param primary_key: Primary key for tracking observable items
+    :param dependencies: List of ORM to register as dependencies for
+        orm_notify. If None the observer will subscribe to notifications from
+        the queryset model.
 
     """
+    if poll_interval and dependencies:
+        raise ValueError('Only one of poll_interval and dependencies arguments allowed')
 
     def decorator_observable(method_or_viewset):
 
@@ -51,7 +58,7 @@ def observable(_method_or_viewset=None, poll_interval=None, primary_key=None):
 
                 # Initialize observer and subscribe.
                 instance = observer.QueryObserver(request)
-                data = instance.subscribe(session_id)
+                data = instance.subscribe(session_id, dependencies)
 
                 return response.Response({'observer': instance.id, 'items': data})
             else:

@@ -20,7 +20,7 @@ class ExampleItemViewSet(
     filter_fields = ('name', 'enabled', 'items')
 
 
-@observable
+@observable(dependencies=[models.ExampleSubItem, models.ExampleItem])
 class ExampleSubItemViewSet(
     mixins.RetrieveModelMixin, mixins.ListModelMixin, viewsets.GenericViewSet
 ):
@@ -40,7 +40,7 @@ class PaginatedViewSet(
     pagination_class = LimitOffsetPagination
 
 
-@observable
+@observable(dependencies=[models.ExampleItem, models.ExampleM2MItem.items.through])
 class AggregationTestViewSet(
     mixins.RetrieveModelMixin, mixins.ListModelMixin, viewsets.GenericViewSet
 ):
