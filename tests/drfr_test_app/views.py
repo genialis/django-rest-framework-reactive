@@ -5,7 +5,7 @@ from rest_framework import mixins, viewsets
 from rest_framework.pagination import LimitOffsetPagination
 from rest_framework.response import Response
 
-from rest_framework_reactive.decorators import observable, polling_observable
+from rest_framework_reactive.decorators import observable
 
 from . import models, serializers
 
@@ -66,8 +66,7 @@ class PollingObservableViewSet(
     queryset = models.ExampleItem.objects.none()
     serializer_class = serializers.ExampleItemSerializer
 
-    @observable
-    @polling_observable(2)
+    @observable(poll_interval=2)
     def list(self, request, *args, **kwargs):
         return Response(
             {'static': 'This is a polling observable: {}'.format(time.time())}

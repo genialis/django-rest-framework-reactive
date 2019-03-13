@@ -6,88 +6,70 @@ from . import observer
 from . import request as observer_request
 
 
-def observable(method_or_viewset):
-    """Make the specified ViewSet or ViewSet method  observable.
+def observable(_method_or_viewset=None, poll_interval=None, primary_key=None):
+    """Make ViewSet or ViewSet method observable.
 
     Decorating a ViewSet class is the same as decorating its `list` method.
 
-    If the decorated method returns a response containing a list of items, it
-    must use the provided `LimitOffsetPagination` for any pagination. In case
-    a non-list response is returned, the resulting item will be wrapped into
-    a list.
+    If decorated method returns a response containing a list of items, it must
+    use the provided `LimitOffsetPagination` for any pagination. In case a
+    non-list response is returned, the resulting item will be wrapped into a
+    list.
 
     When multiple decorators are used, `observable` must be the first one to be
     applied as it needs access to the method name.
+
+    :param poll_interval: Configure given observable as a polling observable
+    :param primary_key: Primary key for tracking observable items
+
     """
 
-    if inspect.isclass(method_or_viewset):
-        list_method = getattr(method_or_viewset, 'list', None)
-        if list_method is not None:
-            method_or_viewset.list = observable(list_method)
+    def decorator_observable(method_or_viewset):
 
-        return method_or_viewset
+        if inspect.isclass(method_or_viewset):
+            list_method = getattr(method_or_viewset, 'list', None)
+            if list_method is not None:
+                method_or_viewset.list = observable(list_method)
 
-    # Do not decorate an already observable method twice.
-    if getattr(method_or_viewset, 'is_observable', False):
-        return method_or_viewset
+            return method_or_viewset
 
-    def wrapper(self, request, *args, **kwargs):
-        if observer_request.OBSERVABLE_QUERY_PARAMETER in request.query_params:
-            # TODO: Validate the session identifier.
-            session_id = request.query_params[
-                observer_request.OBSERVABLE_QUERY_PARAMETER
-            ]
+        # Do not decorate an already observable method twice.
+        if getattr(method_or_viewset, 'is_observable', False):
+            return method_or_viewset
 
-            # Create request and subscribe the session to given observer.
-            request = observer_request.Request(
-                self.__class__, method_or_viewset.__name__, request, args, kwargs
-            )
+        def wrapper(self, request, *args, **kwargs):
+            if observer_request.OBSERVABLE_QUERY_PARAMETER in request.query_params:
+                # TODO: Validate the session identifier.
+                session_id = request.query_params[
+                    observer_request.OBSERVABLE_QUERY_PARAMETER
+                ]
 
-            # Initialize observer and subscribe.
-            instance = observer.QueryObserver(request)
-            data = instance.subscribe(session_id)
+                # Create request and subscribe the session to given observer.
+                request = observer_request.Request(
+                    self.__class__, method_or_viewset.__name__, request, args, kwargs
+                )
 
-            return response.Response({'observer': instance.id, 'items': data})
-        else:
-            # Non-reactive API.
-            return method_or_viewset(self, request, *args, **kwargs)
+                # Initialize observer and subscribe.
+                instance = observer.QueryObserver(request)
+                data = instance.subscribe(session_id)
 
-    wrapper.is_observable = True
+                return response.Response({'observer': instance.id, 'items': data})
+            else:
+                # Non-reactive API.
+                return method_or_viewset(self, request, *args, **kwargs)
 
-    # Copy over any special observable attributes.
-    for attribute in dir(method_or_viewset):
-        if attribute.startswith(observer.OBSERVABLE_OPTIONS_PREFIX):
-            setattr(wrapper, attribute, getattr(method_or_viewset, attribute))
+        wrapper.is_observable = True
 
-    return wrapper
+        if poll_interval is not None:
+            wrapper.observable_change_detection = observer.Options.CHANGE_DETECTION_POLL
+            wrapper.observable_poll_interval = poll_interval
 
+        if primary_key is not None:
+            wrapper.observable_primary_key = primary_key
 
-def primary_key(name):
-    """Set primary key for tracking observable items.
+        return wrapper
 
-    :param name: Name of the primary key field
-    """
-
-    def decorator(method):
-        method.observable_primary_key = name
-        return method
-
-    return decorator
-
-
-def polling_observable(interval):
-    """Set polling interval for a polling observable.
-
-    A decorator which configures the given observable as a polling
-    observable. Instead of tracking changes based on notifications from
-    the ORM, the observer is polled periodically.
-
-    :param interval: Poll interval
-    """
-
-    def decorator(method):
-        method.observable_change_detection = observer.Options.CHANGE_DETECTION_POLL
-        method.observable_poll_interval = interval
-        return method
-
-    return decorator
+    if _method_or_viewset is None:
+        return decorator_observable
+    else:
+        return decorator_observable(_method_or_viewset)

@@ -389,6 +389,14 @@ class QueryObserversTestCase(test.TestCase):
         self.assertEqual(observer_models.Subscriber.objects.count(), 1)
         self.assertEqual(observer.subscribers.count(), 1)
 
+    def test_tables_of_empty_results(self):
+        models.ExampleItem.objects.all().delete()
+        query_observer = QueryObserver(
+            request(views.ExampleItemViewSet, offset=10, limit=0)
+        )
+        items = query_observer.subscribe('test-session')
+        print(items)
+
 
 class QueryObserversTransactionTestCase(test.TransactionTestCase):
     def test_subscribe(self):
