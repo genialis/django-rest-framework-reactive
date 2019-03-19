@@ -5,17 +5,17 @@ Change Log
 All notable changes to this project are documented in this file.
 
 
-==========
-Unreleased
-==========
-
-Added
------
-* Observers with the same ID are throttled. The default throttle rate is 2
-  seconds.
+================
+4.0.0 2010-03-19
+================
 
 Changed
 -------
+* **BACKWARD INCOMPATIBLE:** Protocol has changed, including the names of
+  Channels workers.
+* **BACKWARD INCOMPATIBLE:** Observe changes in the queryset model only (by
+  default). Other tables can be tracked by explicitly listing the dependencies
+  in @observable decorator.
 * **BACKWARD INCOMPATIBLE:** Ensure observers exist when subscribing. Subscribe
   (and observer creation) was separated from the evaluation step. Subscribe
   includes subscriber and observer creation if needed, and executes in single
@@ -24,6 +24,11 @@ Changed
   subscribers can be deleted using ``clearobservers`` Django command.
 * **BACKWARD INCOMPATIBLE:** Overhaul Python source distribution (sdist)
 * Support PostgreSQL 10
+
+Added
+-----
+* Observers with the same ID are throttled. The default throttle rate is 2
+  seconds.
 
 
 ================
