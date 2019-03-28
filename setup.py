@@ -38,11 +38,7 @@ setuptools.setup(
         'docs': ['sphinx>=1.3.2', 'sphinx_rtd_theme'],
         'package': ['twine', 'wheel'],
         'test': [
-            'djangorestframework-filters~=0.10.0',
-            # XXX: djangorestframework-filters has too open requirement for
-            # django-filter and doesn't work with the latest version, so we
-            # have to pin it
-            'django-filter~=1.0.0',
+            'django-filter~=2.0.0',
             'django-guardian>=1.4.2',
             'django-priority-batch>=1.0.0',
             'channels-redis~=2.3',
