@@ -1,3 +1,4 @@
+import functools
 import inspect
 
 from rest_framework import response
@@ -44,6 +45,7 @@ def observable(
         if getattr(method_or_viewset, 'is_observable', False):
             return method_or_viewset
 
+        @functools.wraps(method_or_viewset)
         def wrapper(self, request, *args, **kwargs):
             if observer_request.OBSERVABLE_QUERY_PARAMETER in request.query_params:
                 # TODO: Validate the session identifier.
