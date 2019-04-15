@@ -6,6 +6,15 @@ All notable changes to this project are documented in this file.
 
 
 ================
+4.2.0 2019-04-15
+================
+
+Changed
+-------
+* Bump ``channels`` requirement to version 2.2
+
+
+================
 4.1.0 2019-03-28
 ================
 
