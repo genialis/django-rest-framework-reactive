@@ -11,7 +11,7 @@ All notable changes to this project are documented in this file.
 
 Changed
 -------
-* Bump ``channels`` requirement to version 2.2
+- Bump ``channels`` requirement to version 2.2
 
 
 ================
@@ -20,12 +20,12 @@ Changed
 
 Changed
 -------
-* Use ``django-filter`` instead of ``djangorestframework-filters``
-* Bump ``django-filter`` requirement to version 2.0
+- Use ``django-filter`` instead of ``djangorestframework-filters``
+- Bump ``django-filter`` requirement to version 2.0
 
 Fixed
 -----
-* Wrap ``observable`` decorator with ``functools.wraps`` to preserve metadata
+- Wrap ``observable`` decorator with ``functools.wraps`` to preserve metadata
 
 
 ================
@@ -34,23 +34,23 @@ Fixed
 
 Changed
 -------
-* **BACKWARD INCOMPATIBLE:** Protocol has changed, including the names of
+- **BACKWARD INCOMPATIBLE:** Protocol has changed, including the names of
   Channels workers.
-* **BACKWARD INCOMPATIBLE:** Observe changes in the queryset model only (by
+- **BACKWARD INCOMPATIBLE:** Observe changes in the queryset model only (by
   default). Other tables can be tracked by explicitly listing the dependencies
   in @observable decorator.
-* **BACKWARD INCOMPATIBLE:** Ensure observers exist when subscribing. Subscribe
+- **BACKWARD INCOMPATIBLE:** Ensure observers exist when subscribing. Subscribe
   (and observer creation) was separated from the evaluation step. Subscribe
   includes subscriber and observer creation if needed, and executes in single
   query. Observer instances are not removed from database anymore. Observers
   without subscribers are skipped to optimize performance. Observers and
   subscribers can be deleted using ``clearobservers`` Django command.
-* **BACKWARD INCOMPATIBLE:** Overhaul Python source distribution (sdist)
-* Support PostgreSQL 10
+- **BACKWARD INCOMPATIBLE:** Overhaul Python source distribution (sdist)
+- Support PostgreSQL 10
 
 Added
 -----
-* Observers with the same ID are throttled. The default throttle rate is 2
+- Observers with the same ID are throttled. The default throttle rate is 2
   seconds.
 
 
@@ -60,7 +60,7 @@ Added
 
 Added
 -----
-* Optionally batch observer notifications
+- Optionally batch observer notifications
 
 
 ================
@@ -69,7 +69,7 @@ Added
 
 Fixed
 -----
-* Retry taking the observer lock before evaluation on IntegrityError due
+- Retry taking the observer lock before evaluation on IntegrityError due
   to concurrent observer creation
 
 
@@ -79,8 +79,8 @@ Fixed
 
 Fixed
 -----
-* Do not mutate received update message in client consumer
-* Use a bounded cache with LRU eviction policy for executors
+- Do not mutate received update message in client consumer
+- Use a bounded cache with LRU eviction policy for executors
 
 
 ================
@@ -89,7 +89,7 @@ Fixed
 
 Fixed
 -----
-* Do not generate notification messages when there are no updates
+- Do not generate notification messages when there are no updates
 
 
 ================
@@ -98,7 +98,7 @@ Fixed
 
 Fixed
 -----
-* Fix IntegrityError on concurrent evaluations
+- Fix IntegrityError on concurrent evaluations
 
 
 ================
@@ -107,7 +107,7 @@ Fixed
 
 Fixed
 -----
-* Rewrite query interceptor to properly handle multiple threads
+- Rewrite query interceptor to properly handle multiple threads
 
 
 ================
@@ -116,13 +116,13 @@ Fixed
 
 Added
 -----
-* Add ``clearobservers`` management command which clears all observer
+- Add ``clearobservers`` management command which clears all observer
   state from the database.
 
 Fixed
 -----
-* Fix viewsets without dependencies returning no results
-* Fix issues with handling observer subscribers
+- Fix viewsets without dependencies returning no results
+- Fix issues with handling observer subscribers
 
 
 ================
@@ -131,11 +131,11 @@ Fixed
 
 Fixed
 -----
-* Defer ordering unique constraints when updating items
-* Dispatch observer evaluations to other workers instead of processing
+- Defer ordering unique constraints when updating items
+- Dispatch observer evaluations to other workers instead of processing
   everything in the same worker
-* Fix issues with query interceptor in multiple threads
-* Cast primary keys in ORM signals to string to avoid JSON serialization
+- Fix issues with query interceptor in multiple threads
+- Cast primary keys in ORM signals to string to avoid JSON serialization
   failures
 
 
@@ -145,7 +145,7 @@ Fixed
 
 Fixed
 -----
-* Ignore own ORM updates when processing observers
+- Ignore own ORM updates when processing observers
 
 
 ================
@@ -154,7 +154,7 @@ Fixed
 
 Fixed
 -----
-* Fix issues with handling observer subscribers
+- Fix issues with handling observer subscribers
 
 
 ================
@@ -163,7 +163,7 @@ Fixed
 
 Changed
 -------
-* **BACKWARD INCOMPATIBLE:** Port to Django Channels 2.1 and add support
+- **BACKWARD INCOMPATIBLE:** Port to Django Channels 2.1 and add support
   for running multiple workers.
 
 
@@ -173,9 +173,9 @@ Changed
 
 Fixed
 -----
-* Do not override primary key when an endpoint returns a single item and
+- Do not override primary key when an endpoint returns a single item and
   it already has a primary key set
-* Fix Channels dependencies
+- Fix Channels dependencies
 
 
 ================
@@ -197,8 +197,8 @@ Changed
 
 Fixed
 -----
-* Dependency detection when subqueries are used
-* Reactivity when M2M relationships are modified
+- Dependency detection when subqueries are used
+- Reactivity when M2M relationships are modified
 
 
 =================
@@ -207,12 +207,12 @@ Fixed
 
 Added
 -----
-* Python 3 compatibility
-* Improve logging for use with Sentry
+- Python 3 compatibility
+- Improve logging for use with Sentry
 
 Fixed
 -----
-* Force evaluation when full results requested
+- Force evaluation when full results requested
 
 =================
 0.12.0 2017-06-22
@@ -220,21 +220,21 @@ Fixed
 
 Added
 -----
-* Logging of slow observers and automatic stopping of very slow
+- Logging of slow observers and automatic stopping of very slow
   observers (both are configurable)
-* Status endpoint to track server status
-* Configurable update batch delay
-* Polling observers
+- Status endpoint to track server status
+- Configurable update batch delay
+- Polling observers
 
 Fixed
 -----
-* ``META`` passthrough in requests
-* Correct passthrough of ``request.method``
-* Improved observer concurrency
+- ``META`` passthrough in requests
+- Correct passthrough of ``request.method``
+- Improved observer concurrency
 
 Changed
 -------
-* More easily support different concurrency backends
+- More easily support different concurrency backends
 
 
 =================
@@ -243,4 +243,4 @@ Changed
 
 Changed
 -------
-* Transparently support paginated viewsets
+- Transparently support paginated viewsets
