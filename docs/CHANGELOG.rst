@@ -6,6 +6,20 @@ All notable changes to this project are documented in this file.
 
 
 ================
+4.1.0 2019-03-28
+================
+
+Changed
+-------
+* Use ``django-filter`` instead of ``djangorestframework-filters``
+* Bump ``django-filter`` requirement to version 2.0
+
+Fixed
+-----
+* Wrap ``observable`` decorator with ``functools.wraps`` to preserve metadata
+
+
+================
 4.0.0 2019-03-19
 ================
 
