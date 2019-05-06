@@ -14,7 +14,7 @@ class ExampleItem(models.Model):
 
 
 class ExampleSubItem(models.Model):
-    parent = models.ForeignKey(ExampleItem)
+    parent = models.ForeignKey(ExampleItem, on_delete=models.CASCADE)
     enabled = models.BooleanField()
 
     class Meta:
