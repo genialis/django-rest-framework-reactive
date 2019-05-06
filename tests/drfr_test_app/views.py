@@ -17,7 +17,7 @@ class ExampleItemViewSet(
 
     queryset = models.ExampleItem.objects.all()
     serializer_class = serializers.ExampleItemSerializer
-    filter_fields = ('name', 'enabled', 'items')
+    filterset_fields = ('name', 'enabled', 'items')
 
 
 @observable(dependencies=[models.ExampleSubItem, models.ExampleItem])
@@ -27,7 +27,7 @@ class ExampleSubItemViewSet(
 
     queryset = models.ExampleSubItem.objects.all()
     serializer_class = serializers.ExampleSubItemSerializer
-    filter_fields = ('parent__enabled', 'enabled')
+    filterset_fields = ('parent__enabled', 'enabled')
 
 
 @observable
@@ -47,7 +47,7 @@ class AggregationTestViewSet(
 
     queryset = models.ExampleItem.objects.all()
     serializer_class = serializers.ExampleItemSerializer
-    filter_fields = ('items',)
+    filterset_fields = ('items',)
 
     def list(self, request, *args, **kwargs):
         """Filtered query, which just returns a count.
