@@ -15,6 +15,10 @@ Changed
 - **BACKWARD INCOMPATIBLE:** Bump ``Django REST framework`` requirement to
   version ``3.9``
 
+Added
+-----
+- Support Python 3.7
+
 
 ================
 4.2.1 2019-05-06

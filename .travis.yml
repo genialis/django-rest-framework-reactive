@@ -26,6 +26,15 @@ jobs:
         - DRFR_POSTGRESQL_USER=postgres
         - DRFR_POSTGRESQL_PORT=5432
         - DRFR_REDIS_PORT=6379
+    - stage: test
+      python: "3.7"
+      env:
+        - TOX_ENV=py37
+        # Set environment variables with information how to use the required
+        # services.
+        - DRFR_POSTGRESQL_USER=postgres
+        - DRFR_POSTGRESQL_PORT=5432
+        - DRFR_REDIS_PORT=6379
 
     # NOTE: We undo almost all global Travis CI step definitions to ensure the
     # following Tox environments are run without access to any service.
