@@ -36,7 +36,7 @@ setuptools.setup(
         'test': [
             'django-filter~=2.0.0',
             'django-guardian>=1.4.2',
-            'django-priority-batch>=1.0.0',
+            'django-priority-batch~=1.1.0',
             'channels-redis~=2.4',
             'pylint>=1.4.3',
             'pytest~=3.5.1',

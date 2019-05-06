@@ -5,6 +5,15 @@ Change Log
 All notable changes to this project are documented in this file.
 
 
+==========
+Unreleased
+==========
+
+Fixed
+-----
+- Pin ``django-priority-batch`` to version ``1.1`` to fix compatibility issues
+
+
 ================
 4.2.0 2019-04-15
 ================
