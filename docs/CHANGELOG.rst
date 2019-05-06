@@ -5,6 +5,17 @@ Change Log
 All notable changes to this project are documented in this file.
 
 
+==========
+Unreleased
+==========
+
+Changed
+-------
+- **BACKWARD INCOMPATIBLE:** Bump ``Django`` requirement to version ``2.2``
+- **BACKWARD INCOMPATIBLE:** Bump ``Django REST framework`` requirement to
+  version ``3.9``
+
+
 ================
 4.2.1 2019-05-06
 ================
