@@ -10,6 +10,7 @@ class ExampleItem(models.Model):
 
     class Meta:
         permissions = (("view_exampleitem", "Can view example item"),)
+        default_permissions = ()
         ordering = ['pk']
 
 
@@ -19,6 +20,7 @@ class ExampleSubItem(models.Model):
 
     class Meta:
         permissions = (("view_examplesubitem", "Can view example sub item"),)
+        default_permissions = ()
         ordering = ['pk']
 
 

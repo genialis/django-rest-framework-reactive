@@ -31,6 +31,7 @@ class Migration(migrations.Migration):
             options={
                 'ordering': ['pk'],
                 'permissions': (('view_exampleitem', 'Can view example item'),),
+                'default_permissions': (),
             },
         ),
         migrations.CreateModel(
@@ -79,6 +80,7 @@ class Migration(migrations.Migration):
             options={
                 'ordering': ['pk'],
                 'permissions': (('view_examplesubitem', 'Can view example sub item'),),
+                'default_permissions': (),
             },
         ),
     ]
