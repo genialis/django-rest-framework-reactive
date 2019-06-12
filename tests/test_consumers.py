@@ -7,7 +7,7 @@ from channels.db import database_sync_to_async
 from channels.layers import get_channel_layer
 from channels.routing import URLRouter
 from channels.testing import ApplicationCommunicator, WebsocketCommunicator
-from django.conf.urls import url
+from django.urls import path
 from django.core.cache import cache
 from django.test import override_settings
 from rest_framework import request as api_request
@@ -50,7 +50,7 @@ def assert_subscribers(num, observer_id=None):
 @pytest.mark.django_db(transaction=True)
 @pytest.mark.asyncio
 async def test_worker_and_client():
-    client_consumer = URLRouter([url(r'^ws/(?P<subscriber_id>.+)$', ClientConsumer)])
+    client_consumer = URLRouter([path('ws/<slug:subscriber_id>', ClientConsumer)])
 
     client = WebsocketCommunicator(client_consumer, '/ws/test-session')
     main = ApplicationCommunicator(
@@ -151,7 +151,7 @@ async def test_poll_observer():
 @pytest.mark.django_db(transaction=True)
 @pytest.mark.asyncio
 async def test_poll_observer_integration():
-    client_consumer = URLRouter([url(r'^ws/(?P<subscriber_id>.+)$', ClientConsumer)])
+    client_consumer = URLRouter([path('ws/<slug:subscriber_id>', ClientConsumer)])
 
     client = WebsocketCommunicator(client_consumer, '/ws/test-session')
     main = ApplicationCommunicator(

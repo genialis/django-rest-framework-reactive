@@ -1,5 +1,5 @@
 from channels.routing import ChannelNameRouter, ProtocolTypeRouter, URLRouter
-from django.conf.urls import url
+from django.urls import path
 
 from .consumers import ClientConsumer, MainConsumer, WorkerConsumer
 from .protocol import CHANNEL_MAIN, CHANNEL_WORKER
@@ -11,7 +11,7 @@ application = ProtocolTypeRouter(
             [
                 # To change the prefix, you can import ClientConsumer in your custom
                 # Channels routing definitions instead of using these defaults.
-                url(r'^ws/(?P<subscriber_id>.+)$', ClientConsumer)
+                path('ws/<slug:subscriber_id>', ClientConsumer)
             ]
         ),
         # Background worker consumers.

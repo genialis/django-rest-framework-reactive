@@ -79,7 +79,7 @@ Configure your Django Channels ``routing.py`` to include the required paths:
 
 .. code::
 
-    from django.conf.urls import url
+    from django.urls import path
 
     from channels.routing import ChannelNameRouter, ProtocolTypeRouter, URLRouter
 
@@ -91,7 +91,7 @@ Configure your Django Channels ``routing.py`` to include the required paths:
         'websocket': URLRouter([
             # To change the prefix, you can import ClientConsumer in your custom
             # Channels routing definitions instead of using these defaults.
-            url(r'^ws/(?P<subscriber_id>.+)$', ClientConsumer),
+            path('ws/<slug:subscriber_id>', ClientConsumer),
         ]),
 
         # Background worker consumers.
