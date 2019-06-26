@@ -37,7 +37,12 @@ def observable(
         if inspect.isclass(method_or_viewset):
             list_method = getattr(method_or_viewset, 'list', None)
             if list_method is not None:
-                method_or_viewset.list = observable(list_method)
+                method_or_viewset.list = observable(
+                    list_method,
+                    poll_interval=poll_interval,
+                    primary_key=primary_key,
+                    dependencies=dependencies,
+                )
 
             return method_or_viewset
 
@@ -60,7 +65,7 @@ def observable(
 
                 # Initialize observer and subscribe.
                 instance = observer.QueryObserver(request)
-                data = instance.subscribe(session_id, dependencies)
+                data = instance.subscribe(session_id)
 
                 return response.Response({'observer': instance.id, 'items': data})
             else:
@@ -75,6 +80,9 @@ def observable(
 
         if primary_key is not None:
             wrapper.observable_primary_key = primary_key
+
+        if dependencies is not None:
+            wrapper.observable_dependencies = dependencies
 
         return wrapper
 

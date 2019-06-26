@@ -217,9 +217,7 @@ class QueryObserversTestCase(test.TestCase):
         observer = QueryObserver(
             request(views.ExampleSubItemViewSet, parent__enabled=True)
         )
-        items = observer.subscribe(
-            'test-session', dependencies=[models.ExampleSubItem, models.ExampleItem]
-        )
+        items = observer.subscribe('test-session')
 
         self.assertEqual(
             observer.id,
@@ -250,10 +248,7 @@ class QueryObserversTestCase(test.TestCase):
         observer = QueryObserver(
             request(views.AggregationTestViewSet, items=[m2m_item.pk])
         )
-        observer.subscribe(
-            'test-session',
-            dependencies=[models.ExampleItem, models.ExampleM2MItem.items.through],
-        )
+        observer.subscribe('test-session')
 
         # There should be a dependency on the intermediate table.
         observer_state = observer_models.Observer.objects.get(pk=observer.id)
@@ -442,4 +437,12 @@ class QueryObserversTransactionTestCase(test.TransactionTestCase):
 
         self.assertEqual(
             bytes(observer_obj.request), bytes(observer_with_same_request.request)
+        )
+
+    def test_decorate_class(self):
+        """Decorating class should pass dependencies to the list method"""
+        observer = QueryObserver(request(views.AggregationTestViewSet))
+        observer.subscribe('test-session')
+        self.assertEqual(
+            observer_models.Dependency.objects.filter(observer=observer.id).count(), 2
         )

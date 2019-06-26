@@ -55,6 +55,7 @@ class Options:
             'change_detection', Options.CHANGE_DETECTION_PUSH
         )
         self.poll_interval = self.get_option('poll_interval')
+        self.dependencies = self.get_option('dependencies')
 
     def get_option(self, name, default=None):
         return getattr(
@@ -125,11 +126,10 @@ class QueryObserver:
             extra=self._get_logging_extra(duration=duration, results=results),
         )
 
-    def subscribe(self, session_id, dependencies=None):
+    def subscribe(self, session_id):
         """Initialize observer and register subscriber.
 
         :param session_id: Subscriber's session identifier
-        :param dependencies: List of ORM to register as dependencies for orm_notify
         """
         try:
             change_detection = self._meta.change_detection
@@ -143,13 +143,15 @@ class QueryObserver:
                     )
                 )
 
-            viewset_results = self._viewset_results()
-
             poll_interval = (
                 self._meta.poll_interval
                 if change_detection == Options.CHANGE_DETECTION_POLL
                 else None
             )
+
+            dependencies = self._meta.dependencies
+
+            viewset_results = self._viewset_results()
 
             # Subscribe to observer in a single query. First, create an
             # observer, then create a subscriber, and finally subscribe to
