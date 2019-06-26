@@ -6,6 +6,15 @@ All notable changes to this project are documented in this file.
 
 
 ================
+5.0.1 2019-06-26
+================
+
+Fixed
+-----
+- Pass dependencies and other arguments to list decorator when decorating class
+
+
+================
 5.0.0 2019-05-06
 ================
 
