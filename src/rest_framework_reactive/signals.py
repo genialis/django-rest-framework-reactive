@@ -12,7 +12,7 @@ from .models import Observer
 from .protocol import *
 
 # Logger.
-logger = logging.getLogger(__name__)  # pylint: disable=invalid-name
+logger = logging.getLogger(__name__)
 
 # Global 'in migrations' flag to skip certain operations during migrations.
 IN_MIGRATIONS = False

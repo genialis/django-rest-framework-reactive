@@ -10,4 +10,4 @@ class BaseConfig(AppConfig):
     def ready(self):
         """Perform application initialization."""
         # Connect all signals.
-        from . import signals  # pylint: disable=unused-variable
+        from . import signals

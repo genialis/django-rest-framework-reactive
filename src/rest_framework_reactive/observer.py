@@ -17,7 +17,7 @@ from .connection import get_queryobserver_settings
 from .protocol import *
 
 # Logger.
-logger = logging.getLogger(__name__)  # pylint: disable=invalid-name
+logger = logging.getLogger(__name__)
 
 # Observable method options attribute name prefix.
 OBSERVABLE_OPTIONS_PREFIX = 'observable_'

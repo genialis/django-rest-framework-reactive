@@ -38,7 +38,6 @@ setuptools.setup(
             'django-guardian>=1.5',
             'django-priority-batch~=2.0',
             'channels-redis~=2.4',
-            'pylint~=2.3.1',
             'pytest~=4.4.1',
             'pytest-django~=3.4.8',
             'pytest-asyncio~=0.10.0',
