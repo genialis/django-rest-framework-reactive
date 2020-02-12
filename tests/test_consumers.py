@@ -1,5 +1,4 @@
 import asyncio
-from concurrent.futures import CancelledError
 
 import async_timeout
 import pytest
@@ -128,21 +127,17 @@ async def test_poll_observer():
     main = ApplicationCommunicator(
         MainConsumer, {'type': 'channel', 'channel': CHANNEL_MAIN}
     )
-
     await main.send_input({'type': TYPE_POLL, 'observer': 'test', 'interval': 2})
-
     channel_layer = get_channel_layer()
 
     # Nothing should be received in the first second.
-    async with async_timeout.timeout(1):
-        try:
+    with pytest.raises(asyncio.TimeoutError):
+        async with async_timeout.timeout(1):
             await channel_layer.receive(CHANNEL_WORKER)
             assert False
-        except CancelledError:
-            pass
 
+    # Then after another second we should get a notification.
     async with async_timeout.timeout(2):
-        # Then after another second we should get a notification.
         notify = await channel_layer.receive(CHANNEL_WORKER)
         assert notify['type'] == TYPE_EVALUATE
         assert notify['observer'] == 'test'
@@ -190,12 +185,10 @@ async def test_poll_observer_integration():
         await main.send_input(notify)
 
     # Nothing should be received in the first second.
-    async with async_timeout.timeout(1):
-        try:
+    with pytest.raises(asyncio.TimeoutError):
+        async with async_timeout.timeout(1):
             await channel_layer.receive(CHANNEL_WORKER)
             assert False
-        except CancelledError:
-            pass
 
     async with async_timeout.timeout(2):
         # Then after another second we should get a notification.
