@@ -6,5 +6,5 @@ requires = [
 build-backend = "setuptools.build_meta"
 
 [tool.black]
-target_version = ['py36', 'py37']
+target_version = ['py36', 'py37', 'py38']
 skip-string-normalization = true

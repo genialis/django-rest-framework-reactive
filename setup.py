@@ -28,7 +28,7 @@ setuptools.setup(
         'src', exclude=['tests', 'tests.*', '*.tests', '*.tests.*']
     ),
     package_dir={'': 'src'},
-    python_requires='>=3.6, <3.8',
+    python_requires='>=3.6, <3.9',
     install_requires=['Django~=2.2', 'djangorestframework~=3.9', 'channels~=2.2'],
     extras_require={
         'docs': ['sphinx>=1.3.2', 'sphinx_rtd_theme'],
@@ -65,6 +65,7 @@ setuptools.setup(
         'Programming Language :: Python :: 3',
         'Programming Language :: Python :: 3.6',
         'Programming Language :: Python :: 3.7',
+        'Programming Language :: Python :: 3.8',
     ],
     keywords='django-rest-framework reactive django',
 )
