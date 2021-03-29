@@ -2,14 +2,14 @@
 # explicitly overriden in the jobs.include matrix.
 
 language: python
-dist: xenial
+dist: focal
 python: "3.6"
 
 services:
   - redis-server
 
 addons:
-  postgresql: "10"
+  postgresql: "13"
 
 install: pip install tox
 
@@ -19,6 +19,8 @@ script: tox -e $TOX_ENV
 jobs:
   include:
     - stage: test
+      before_install:
+        - python -m pip install --upgrade pip
       env:
         - TOX_ENV=py36
         # Set environment variables with information how to use the required
