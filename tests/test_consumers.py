@@ -49,14 +49,16 @@ def assert_subscribers(num, observer_id=None):
 @pytest.mark.django_db(transaction=True)
 @pytest.mark.asyncio
 async def test_worker_and_client():
-    client_consumer = URLRouter([path('ws/<slug:subscriber_id>', ClientConsumer)])
+    client_consumer = URLRouter(
+        [path('ws/<slug:subscriber_id>', ClientConsumer().as_asgi())]
+    )
 
     client = WebsocketCommunicator(client_consumer, '/ws/test-session')
     main = ApplicationCommunicator(
-        MainConsumer, {'type': 'channel', 'channel': CHANNEL_MAIN}
+        MainConsumer(), {'type': 'channel', 'channel': CHANNEL_MAIN}
     )
     worker = ApplicationCommunicator(
-        WorkerConsumer, {'type': 'channel', 'channel': CHANNEL_WORKER}
+        WorkerConsumer(), {'type': 'channel', 'channel': CHANNEL_WORKER}
     )
 
     # Connect client.
@@ -106,7 +108,11 @@ async def test_worker_and_client():
         assert response['msg'] == 'added'
         assert response['primary_key'] == 'id'
         assert response['order'] == 0
-        assert response['item'] == {'id': 1, 'enabled': True, 'name': 'hello world'}
+        assert response['item'] == {
+            'id': primary_key,
+            'enabled': True,
+            'name': 'hello world',
+        }
 
     # No other messages should be sent.
     assert await client.receive_nothing() is True
@@ -125,7 +131,7 @@ async def test_worker_and_client():
 @pytest.mark.asyncio
 async def test_poll_observer():
     main = ApplicationCommunicator(
-        MainConsumer, {'type': 'channel', 'channel': CHANNEL_MAIN}
+        MainConsumer(), {'type': 'channel', 'channel': CHANNEL_MAIN}
     )
     await main.send_input({'type': TYPE_POLL, 'observer': 'test', 'interval': 2})
     channel_layer = get_channel_layer()
@@ -146,14 +152,16 @@ async def test_poll_observer():
 @pytest.mark.django_db(transaction=True)
 @pytest.mark.asyncio
 async def test_poll_observer_integration():
-    client_consumer = URLRouter([path('ws/<slug:subscriber_id>', ClientConsumer)])
+    client_consumer = URLRouter(
+        [path('ws/<slug:subscriber_id>', ClientConsumer().as_asgi())]
+    )
 
     client = WebsocketCommunicator(client_consumer, '/ws/test-session')
     main = ApplicationCommunicator(
-        MainConsumer, {'type': 'channel', 'channel': CHANNEL_MAIN}
+        MainConsumer(), {'type': 'channel', 'channel': CHANNEL_MAIN}
     )
     worker = ApplicationCommunicator(
-        WorkerConsumer, {'type': 'channel', 'channel': CHANNEL_WORKER}
+        WorkerConsumer(), {'type': 'channel', 'channel': CHANNEL_WORKER}
     )
 
     # Connect client.
@@ -221,10 +229,10 @@ async def test_throttle_observer():
     with override_settings(DJANGO_REST_FRAMEWORK_REACTIVE={'throttle_rate': 2}):
         channel_layer = get_channel_layer()
         main = ApplicationCommunicator(
-            MainConsumer, {'type': 'channel', 'channel': CHANNEL_MAIN}
+            MainConsumer(), {'type': 'channel', 'channel': CHANNEL_MAIN}
         )
         worker = ApplicationCommunicator(
-            WorkerConsumer, {'type': 'channel', 'channel': CHANNEL_WORKER}
+            WorkerConsumer(), {'type': 'channel', 'channel': CHANNEL_WORKER}
         )
 
         @database_sync_to_async

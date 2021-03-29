@@ -1,4 +1,3 @@
-from django.contrib.postgres.fields import JSONField
 from django.db import models
 
 
@@ -23,7 +22,7 @@ class Item(models.Model):
     )
     primary_key = models.CharField(max_length=200)
     order = models.IntegerField()
-    data = JSONField()
+    data = models.JSONField()
 
     class Meta:
         unique_together = (('observer', 'order'), ('observer', 'primary_key'))

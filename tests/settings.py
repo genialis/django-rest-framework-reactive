@@ -49,7 +49,10 @@ TEMPLATES = [
     }
 ]
 
-AUTHENTICATION_BACKENDS = ('django.contrib.auth.backends.ModelBackend',)
+AUTHENTICATION_BACKENDS = (
+    'django.contrib.auth.backends.ModelBackend',
+    'guardian.backends.ObjectPermissionBackend',
+)
 
 ANONYMOUS_USER_NAME = 'public'
 
@@ -60,6 +63,7 @@ toxenv = os.environ.get('TOXENV', '')
 # Check if PostgreSQL settings are set via environment variables
 pgname = os.environ.get('DRFR_POSTGRESQL_NAME', 'drfr')
 pguser = os.environ.get('DRFR_POSTGRESQL_USER', 'drfr')
+pgpass = os.environ.get('DRFR_POSTGRESQL_PASS', 'drfr')
 pghost = os.environ.get('DRFR_POSTGRESQL_HOST', 'localhost')
 pgport = int(os.environ.get('DRFR_POSTGRESQL_PORT', 55435))
 
@@ -68,6 +72,7 @@ DATABASES = {
         'ENGINE': 'django.db.backends.postgresql',
         'NAME': pgname,
         'USER': pguser,
+        'PASSWORD': pgpass,
         'HOST': pghost,
         'PORT': pgport,
         'TEST': {'NAME': 'drfr_test' + toxenv},

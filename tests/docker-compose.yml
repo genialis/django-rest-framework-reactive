@@ -6,6 +6,7 @@ postgresql:
     environment:
         POSTGRES_USER: drfr
         POSTGRES_DB: drfr
+        POSTGRES_PASSWORD: drfr
     ports:
         - "55435:5432"
 redis:

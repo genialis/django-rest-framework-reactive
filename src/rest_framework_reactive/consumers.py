@@ -63,7 +63,6 @@ class WorkerConsumer(AsyncConsumer):
     def __init__(self, *args, **kwargs):
         """Construct observer worker consumer."""
         self._executor_cache = collections.OrderedDict()
-        super().__init__(*args, **kwargs)
 
     async def _evaluate(self, observer_id):
         # Get Observer from database.
