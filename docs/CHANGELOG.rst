@@ -5,6 +5,15 @@ Change Log
 All notable changes to this project are documented in this file.
 
 
+==========
+Unreleased
+==========
+
+Added
+-----
+- Add support for Python 3.9
+
+
 ================
 5.1.0 2020-02-13
 ================
