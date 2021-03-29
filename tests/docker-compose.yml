@@ -10,7 +10,6 @@ postgresql:
     ports:
         - "55435:5432"
 redis:
-    image: redis
+    image: redis:5
     ports:
         - "56380:6379"
-
