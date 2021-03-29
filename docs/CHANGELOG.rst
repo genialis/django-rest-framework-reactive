@@ -12,6 +12,7 @@ Unreleased
 Added
 -----
 - Add support for Python 3.9
+- Use Github Actions to run the tests
 
 
 ================
