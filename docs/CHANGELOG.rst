@@ -5,9 +5,15 @@ Change Log
 All notable changes to this project are documented in this file.
 
 
-==========
-Unreleased
-==========
+================
+6.0.0 2021-04-19
+================
+
+Changed
+-------
+- **BACKWARD INCOMPATIBLE:** Require ``Django`` 3.x
+- **BACKWARD INCOMPATIBLE:** Require ``Django Channels`` version 3.0.x
+- Bump ``Django REST framework`` requirement to version ``3.12``
 
 Added
 -----
@@ -20,7 +26,7 @@ Added
 ================
 
 Added
--------
+-----
 - Add support for Python 3.8
 
 
