@@ -30,7 +30,7 @@ setuptools.setup(
     package_dir={'': 'src'},
     python_requires='>=3.6, <3.10',
     install_requires=[
-        'Django~=3.1.7',
+        'Django~=3.0',
         'djangorestframework~=3.12.2',
         'channels~=3.0.3',
     ],
