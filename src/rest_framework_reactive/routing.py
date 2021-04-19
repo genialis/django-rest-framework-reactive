@@ -11,12 +11,15 @@ application = ProtocolTypeRouter(
             [
                 # To change the prefix, you can import ClientConsumer in your custom
                 # Channels routing definitions instead of using these defaults.
-                path('ws/<slug:subscriber_id>', ClientConsumer)
+                path('ws/<slug:subscriber_id>', ClientConsumer.as_asgi())
             ]
         ),
         # Background worker consumers.
         'channel': ChannelNameRouter(
-            {CHANNEL_MAIN: MainConsumer, CHANNEL_WORKER: WorkerConsumer}
+            {
+                CHANNEL_MAIN: MainConsumer.as_asgi(),
+                CHANNEL_WORKER: WorkerConsumer.as_asgi(),
+            }
         ),
     }
 )
