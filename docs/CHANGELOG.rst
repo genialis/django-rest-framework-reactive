@@ -5,6 +5,15 @@ Change Log
 All notable changes to this project are documented in this file.
 
 
+==========
+Unreleased
+==========
+
+Added
+-----
+- Add support for Python 3.10
+
+
 ================
 6.0.0 2021-04-19
 ================

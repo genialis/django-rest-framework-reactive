@@ -1,4 +1,5 @@
 import os.path
+
 import setuptools
 
 # Get long description from README.
@@ -28,7 +29,7 @@ setuptools.setup(
         'src', exclude=['tests', 'tests.*', '*.tests', '*.tests.*']
     ),
     package_dir={'': 'src'},
-    python_requires='>=3.6, <3.10',
+    python_requires='>=3.6, <3.11',
     install_requires=[
         'Django~=3.0',
         'djangorestframework~=3.12.2',
@@ -71,6 +72,7 @@ setuptools.setup(
         'Programming Language :: Python :: 3.7',
         'Programming Language :: Python :: 3.8',
         'Programming Language :: Python :: 3.9',
+        'Programming Language :: Python :: 3.10',
     ],
     keywords='django-rest-framework reactive django',
 )
