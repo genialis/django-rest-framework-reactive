@@ -13,6 +13,10 @@ Added
 -----
 - Add support for Python 3.10
 
+Changed
+-------
+- **BACKWARD INCOMPATIBLE:** Drop support for ``Django`` 3.0 and 3.1
+
 
 ================
 6.0.0 2021-04-19
