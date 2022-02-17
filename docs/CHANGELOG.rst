@@ -16,6 +16,8 @@ Added
 Changed
 -------
 - **BACKWARD INCOMPATIBLE:** Drop support for ``Django`` 3.0 and 3.1
+- **BACKWARD INCOMPATIBLE:** Require ``Django Priority Batch`` version 4
+- Bump requirements version
 
 
 ================
