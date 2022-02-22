@@ -6,6 +6,14 @@ All notable changes to this project are documented in this file.
 
 
 ================
+7.0.1 2022-02-22
+================
+
+Changed
+-------
+- Migrate id fields to BigAutoField
+
+================
 7.0.0 2022-02-17
 ================
 
