@@ -5,6 +5,16 @@ Change Log
 All notable changes to this project are documented in this file.
 
 
+==========
+Unreleased
+==========
+
+Changed
+-------
+- Reverse the BigAutoField migration due to bug in Django 3.12, which fails to
+  recreate foreign key constraints on auto-generated through tables
+
+
 ================
 7.0.1 2022-02-22
 ================
@@ -12,6 +22,7 @@ All notable changes to this project are documented in this file.
 Changed
 -------
 - Migrate id fields to BigAutoField
+
 
 ================
 7.0.0 2022-02-17
@@ -26,6 +37,11 @@ Changed
 - **BACKWARD INCOMPATIBLE:** Drop support for ``Django`` 3.0 and 3.1
 - **BACKWARD INCOMPATIBLE:** Require ``Django Priority Batch`` version 4
 - Bump requirements version
+
+Change DEFAULT_AUTO_FIELD settings back to AutoField
+
+Due to bug in Django 3.12, which fails to recreate foreign key
+constraints on auto-generated through tables
 
 
 ================
