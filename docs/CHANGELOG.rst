@@ -5,9 +5,9 @@ Change Log
 All notable changes to this project are documented in this file.
 
 
-==========
-Unreleased
-==========
+================
+7.0.2 2022-03-14
+================
 
 Changed
 -------
